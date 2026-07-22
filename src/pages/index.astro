@@ -28,8 +28,10 @@ const populatedCategories = categoryDefinitions.filter((category) => categoryCou
 
   <section class="container py-14" aria-labelledby="search-title">
     <div class="flex flex-wrap items-end justify-between gap-5"><div><p class="text-sm font-semibold text-brand">Public index</p><h2 id="search-title" class="mt-2 text-3xl font-semibold">Find an opportunity</h2></div><a href="/opportunities/" class="inline-flex items-center gap-2 text-sm font-medium">View all <ArrowRight size={16} /></a></div>
-    <div id="search" class="mt-7"></div>
-    <noscript><p class="mt-5">Search needs JavaScript. You can still <a href="/opportunities/">browse every listing</a>.</p></noscript>
+    <form action="/opportunities/" method="get" role="search" class="mt-7 flex max-w-3xl flex-col gap-3 sm:flex-row">
+      <label class="grow"><span class="sr-only">Search opportunities</span><input name="q" type="search" placeholder="Search title, provider, benefit, or audience" class="min-h-12 w-full rounded-md border border-line bg-surface px-4" /></label>
+      <button class="min-h-12 rounded-md bg-action px-5 font-medium text-white">Search the index</button>
+    </form>
     <div class="mt-10 grid gap-x-8 md:grid-cols-2 lg:grid-cols-3" data-pagefind-ignore>
       {active.slice(0, 6).map((listing) => <ListingCard listing={listing} />)}
     </div>
@@ -46,7 +48,4 @@ const populatedCategories = categoryDefinitions.filter((category) => categoryCou
       <div><Users class="text-brand" size={24} /><h2 class="mt-4 font-semibold">Community maintained</h2><p class="mt-2 text-sm leading-6 text-muted">Individuals and companies contribute under one published standard. Sponsorship cannot purchase verification.</p></div>
     </div>
   </section>
-  <link slot="head" href="/pagefind/pagefind-ui.css" rel="stylesheet" />
-  <script is:inline src="/pagefind/pagefind-ui.js"></script>
-  <script is:inline>window.addEventListener('DOMContentLoaded',()=>{if(window.PagefindUI)new window.PagefindUI({element:'#search',showSubResults:true,showImages:false,excerptLength:15});});</script>
 </BaseLayout>

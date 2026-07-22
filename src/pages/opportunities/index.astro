@@ -1,109 +1,141 @@
 ---
 import ListingCard from "../../components/ListingCard.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getCatalogIndex, publicCatalogRecords } from "../../lib/catalog";
 import { getListings } from "../../lib/listings";
-import {
-  categories,
-  categoryDefinitions,
-  subcategoryLabel,
-} from "../../lib/taxonomy";
+import { categoryDefinitions } from "../../lib/taxonomy";
 
 const listings = await getListings();
+const index = publicCatalogRecords(await getCatalogIndex());
+const priority = new Map(["opportunity", "funding", "fellowship", "competition", "event", "program", "benefit", "community", "learning-resource", "resource", "public-dataset", "general-free-product"].map((value, order) => [value, order]));
+const initialIds = new Set(index.sort((a, b) => (priority.get(a.resourceType) ?? 99) - (priority.get(b.resourceType) ?? 99) || b.reviewDate.localeCompare(a.reviewDate) || a.title.localeCompare(b.title)).slice(0, 24).map((record) => record.id));
+const initial = listings.filter((listing) => initialIds.has(listing.id)).sort((a, b) => [...initialIds].indexOf(a.id) - [...initialIds].indexOf(b.id));
+const regions = [...new Set(index.flatMap((record) => record.regions))].sort();
 ---
 
-<BaseLayout
-  title="Browse opportunities — PerkCommons"
-  description="Browse the open PerkCommons index by category and status."
->
+<BaseLayout title="Browse opportunities — PerkCommons" description="Search and filter the open PerkCommons index without loading the full catalogue into the page.">
   <section class="container py-14">
     <p class="text-sm font-semibold text-brand">Public index</p>
-    <h1 class="mt-2 text-4xl font-semibold">All opportunities</h1>
-    <p class="mt-4 max-w-2xl leading-7 text-muted">
-      Filter the complete published dataset. Expired records remain visible for transparency.
-    </p>
-    <form id="directory-filters" role="search" class="mt-8 grid gap-3 border-y border-line py-5 sm:grid-cols-[1fr_260px_auto] sm:items-end">
-      <label>
-        <span class="text-sm font-medium">Search</span>
-        <input id="filter" name="q" type="search" placeholder="Title, provider, subcategory, or tag" class="mt-2 w-full rounded-md border border-line bg-surface px-4 py-3 text-sm" />
-      </label>
-      <label>
-        <span class="text-sm font-medium">Category</span>
-        <select id="category" name="category" class="mt-2 w-full rounded-md border border-line bg-surface px-4 py-3 text-sm">
-          <option value="">All categories</option>
-          {categoryDefinitions.map((category) => <option value={category.id}>{category.label}</option>)}
-        </select>
-      </label>
-      <button id="clear-filters" type="button" class="min-h-11 rounded-md border border-line bg-surface px-4 text-sm font-medium">Clear filters</button>
+    <h1 class="mt-2 text-4xl font-semibold">Find an opportunity</h1>
+    <p class="mt-4 max-w-3xl leading-7 text-muted">The first page is rendered statically. Search and additional pages load a compact index only when needed. Expired, disputed, and archived records are excluded unless you opt in.</p>
+    <form id="directory-filters" role="search" class="mt-8 grid gap-3 border-y border-line py-5 md:grid-cols-2 xl:grid-cols-4">
+      <label class="md:col-span-2"><span class="text-sm font-medium">Search</span><input id="filter" name="q" type="search" placeholder='Try provider, title, benefit, or "exact phrase"' class="mt-2 min-h-11 w-full rounded-md border border-line bg-surface px-4 text-sm" /></label>
+      <label><span class="text-sm font-medium">Category</span><select id="category" name="category" class="mt-2 min-h-11 w-full rounded-md border border-line bg-surface px-3 text-sm"><option value="">All categories</option>{categoryDefinitions.map((category) => <option value={category.id}>{category.label}</option>)}</select></label>
+      <label><span class="text-sm font-medium">Resource type</span><select id="resource-type" name="type" class="mt-2 min-h-11 w-full rounded-md border border-line bg-surface px-3 text-sm"><option value="">All resource types</option>{["opportunity", "funding", "fellowship", "competition", "event", "program", "benefit", "community", "learning-resource", "resource", "public-dataset", "general-free-product"].map((type) => <option value={type}>{type.replaceAll("-", " ")}</option>)}</select></label>
+      <label><span class="text-sm font-medium">Status</span><select id="status" name="status" class="mt-2 min-h-11 w-full rounded-md border border-line bg-surface px-3 text-sm"><option value="">Current statuses</option>{["active", "open", "rolling", "upcoming", "limited", "waitlist", "temporarily-unavailable", "unconfirmed", "closed", "expired", "disputed", "archived"].map((status) => <option value={status}>{status.replaceAll("-", " ")}</option>)}</select></label>
+      <label><span class="text-sm font-medium">Region</span><select id="region" name="region" class="mt-2 min-h-11 w-full rounded-md border border-line bg-surface px-3 text-sm"><option value="">All regions</option>{regions.map((region) => <option value={region}>{region}</option>)}</select></label>
+      <label><span class="text-sm font-medium">Sort</span><select id="sort" name="sort" class="mt-2 min-h-11 w-full rounded-md border border-line bg-surface px-3 text-sm"><option value="relevance">Relevance</option><option value="reviewed">Recently reviewed</option><option value="alphabetical">Alphabetical</option><option value="provider">Provider</option><option value="featured">Featured</option></select></label>
+      <div class="flex items-end gap-3"><label class="flex min-h-11 items-center gap-2 text-sm"><input id="include-archived" name="archived" value="1" type="checkbox" class="size-5" /> Include archived</label><button id="clear-filters" type="button" aria-label="Clear filters" class="min-h-11 rounded-md border border-line bg-surface px-4 text-sm font-medium">Clear</button></div>
     </form>
-    <div class="mt-5 flex flex-wrap items-center justify-between gap-3 text-sm text-muted">
-      <p id="count" aria-live="polite">{listings.length} opportunities</p>
-      <a href="/categories/">Browse category descriptions</a>
-    </div>
-    <div id="listing-grid" class="mt-2 grid gap-x-8 md:grid-cols-2 lg:grid-cols-3">
-      {listings.map((listing) => {
-        const search = [
-          listing.title,
-          listing.provider,
-          categories[listing.category],
-          ...listing.subcategories.map((item) => subcategoryLabel(listing.category, item)),
-          ...listing.tags,
-        ].join(" ").toLowerCase();
-        return <div data-search={search} data-category={listing.category} data-listing-id={listing.id}><ListingCard listing={listing} /></div>;
-      })}
-    </div>
-    <div id="empty" class="hidden py-16 text-center">
-      <p class="font-medium">No opportunities match these filters.</p>
-      <p class="mt-2 text-sm text-muted">Clear the filters or browse a category to continue.</p>
-    </div>
+    <div class="mt-5 flex flex-wrap items-center justify-between gap-3 text-sm text-muted"><p id="count" aria-live="polite">{index.length} current records</p><p id="loading" class="hidden" role="status">Loading catalogue index…</p></div>
+    <div id="listing-grid" class="mt-2 grid gap-x-8 md:grid-cols-2 lg:grid-cols-3" aria-busy="false">{initial.map((listing) => <ListingCard listing={listing} />)}</div>
+    <div id="empty" class="hidden py-16 text-center"><p class="font-medium">No records match these filters.</p><p class="mt-2 text-sm text-muted">Try a broader phrase or clear one of the filters.</p></div>
+    <div class="mt-8 flex justify-center"><button id="load-more" type="button" class="min-h-11 rounded-md border border-line bg-surface px-5 text-sm font-medium">Load more</button></div>
+    <noscript><p class="mt-8 rounded-md border border-line bg-surface p-5">The first 24 records are available above. Enable JavaScript for filters and incremental loading, or use the open JSON, JSONL, and CSV exports.</p></noscript>
   </section>
   <script>
-    const form = document.querySelector<HTMLFormElement>("#directory-filters");
-    const input = document.querySelector<HTMLInputElement>("#filter");
-    const select = document.querySelector<HTMLSelectElement>("#category");
-    const clear = document.querySelector<HTMLButtonElement>("#clear-filters");
-    const cards = [...document.querySelectorAll<HTMLElement>("#listing-grid > div")];
-    const count = document.querySelector<HTMLElement>("#count");
-    const empty = document.querySelector<HTMLElement>("#empty");
-    const params = new URLSearchParams(location.search);
-
-    if (input) input.value = params.get("q") ?? "";
-    if (select && [...select.options].some((option) => option.value === params.get("category"))) {
-      select.value = params.get("category") ?? "";
-    }
-
-    function update(updateUrl = true) {
-      const query = input?.value.trim().toLowerCase() ?? "";
-      const category = select?.value ?? "";
-      let shown = 0;
-      cards.forEach((card) => {
-        const visible =
-          (!query || card.dataset.search?.includes(query)) &&
-          (!category || card.dataset.category === category);
-        card.hidden = !visible;
-        if (visible) shown += 1;
-      });
-      if (count) count.textContent = `${shown} ${shown === 1 ? "opportunity" : "opportunities"}`;
-      empty?.classList.toggle("hidden", shown !== 0);
-      if (updateUrl) {
-        const next = new URL(location.href);
-        query ? next.searchParams.set("q", query) : next.searchParams.delete("q");
-        category ? next.searchParams.set("category", category) : next.searchParams.delete("category");
-        history.replaceState(null, "", `${next.pathname}${next.search}`);
+    interface SearchRecord { id: string; provider: string; title: string; aliases: string[]; description: string; eligibility: string; benefit: string; category: string; categoryLabel: string; subcategories: string[]; tags: string[]; regions: string[]; status: string; reviewDate: string; sponsored: boolean; resourceType: string; canonicalUrl: string; destinationUrl: string; addedAt: string | null; score?: number; }
+    const PAGE_SIZE = 24;
+    const priority = new Map(["opportunity", "funding", "fellowship", "competition", "event", "program", "benefit", "community", "learning-resource", "resource", "public-dataset", "general-free-product"].map((value, order) => [value, order]));
+    const synonyms: Record<string, string[]> = { grant: ["funding", "award"], startup: ["founder", "company"], student: ["learner", "education"], nonprofit: ["charity", "ngo"], remote: ["online", "virtual"], credit: ["credits", "compute"] };
+    const form = document.querySelector<HTMLFormElement>("#directory-filters")!;
+    const input = document.querySelector<HTMLInputElement>("#filter")!;
+    const category = document.querySelector<HTMLSelectElement>("#category")!;
+    const type = document.querySelector<HTMLSelectElement>("#resource-type")!;
+    const status = document.querySelector<HTMLSelectElement>("#status")!;
+    const region = document.querySelector<HTMLSelectElement>("#region")!;
+    const sort = document.querySelector<HTMLSelectElement>("#sort")!;
+    const archived = document.querySelector<HTMLInputElement>("#include-archived")!;
+    const clear = document.querySelector<HTMLButtonElement>("#clear-filters")!;
+    const loadMore = document.querySelector<HTMLButtonElement>("#load-more")!;
+    const grid = document.querySelector<HTMLElement>("#listing-grid")!;
+    const count = document.querySelector<HTMLElement>("#count")!;
+    const loading = document.querySelector<HTMLElement>("#loading")!;
+    const empty = document.querySelector<HTMLElement>("#empty")!;
+    let records: SearchRecord[] | null = null;
+    let shown = PAGE_SIZE;
+    const normalize = (value: string) => value.normalize("NFKD").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const editDistance = (left: string, right: string) => {
+      if (Math.abs(left.length - right.length) > 1) return 2;
+      const row = [...Array(right.length + 1).keys()];
+      for (let i = 1; i <= left.length; i += 1) {
+        let previous = row[0]!; row[0] = i;
+        for (let j = 1; j <= right.length; j += 1) {
+          const saved = row[j]!;
+          row[j] = Math.min(row[j]! + 1, row[j - 1]! + 1, previous + (left[i - 1] === right[j - 1] ? 0 : 1));
+          previous = saved;
+        }
       }
-    }
-
-    form?.addEventListener("submit", (event) => {
-      event.preventDefault();
-      update();
-    });
-    input?.addEventListener("input", () => update());
-    select?.addEventListener("change", () => update());
-    clear?.addEventListener("click", () => {
-      if (input) input.value = "";
-      if (select) select.value = "";
-      update();
-      input?.focus();
-    });
-    update(false);
+      return row[right.length]!;
+    };
+    const score = (record: SearchRecord, query: string) => {
+      if (!query) return 0;
+      const exactPhrases = [...query.matchAll(/"([^"]+)"/g)].map((match) => normalize(match[1]!));
+      const plain = normalize(query.replace(/"[^"]+"/g, " "));
+      const tokens = [...new Set(plain.split(" ").filter(Boolean).flatMap((token) => [token, ...(synonyms[token] ?? [])]))];
+      const fields = { title: normalize(record.title), provider: normalize(record.provider), aliases: normalize(record.aliases.join(" ")), benefit: normalize(record.benefit), category: normalize(`${record.categoryLabel} ${record.resourceType}`), audience: normalize(record.tags.join(" ")), eligibility: normalize(record.eligibility), description: normalize(record.description) };
+      const combined = Object.values(fields).join(" ");
+      if (exactPhrases.some((phrase) => !combined.includes(phrase))) return -1;
+      let total = fields.title === plain ? 1000 : 0;
+      const weights = { title: 300, provider: 220, aliases: 180, benefit: 100, category: 70, audience: 55, eligibility: 25, description: 10 };
+      for (const token of tokens) for (const [field, value] of Object.entries(fields)) if (value.includes(token)) total += weights[field as keyof typeof weights];
+      const importantWords = `${fields.title} ${fields.provider}`.split(" ");
+      for (const token of tokens.filter((item) => item.length > 3)) if (!combined.includes(token) && importantWords.some((word) => editDistance(token, word) <= 1)) total += 40;
+      return tokens.length && total === 0 ? -1 : total;
+    };
+    const loadIndex = async () => {
+      if (records) return records;
+      grid.setAttribute("aria-busy", "true"); loading.classList.remove("hidden");
+      const response = await fetch("/catalog-index.json");
+      if (!response.ok) throw new Error("Catalogue index unavailable");
+      records = ((await response.json()) as { records: SearchRecord[] }).records;
+      grid.setAttribute("aria-busy", "false"); loading.classList.add("hidden");
+      return records;
+    };
+    const appendHighlighted = (element: HTMLElement, value: string, query: string) => {
+      const token = normalize(query).split(" ").find((item) => item.length > 1);
+      if (!token) { element.textContent = value; return; }
+      const position = normalize(value).indexOf(token);
+      if (position < 0) { element.textContent = value; return; }
+      element.append(document.createTextNode(value.slice(0, position)));
+      const mark = document.createElement("mark"); mark.textContent = value.slice(position, position + token.length); element.append(mark, document.createTextNode(value.slice(position + token.length)));
+    };
+    const resultCard = (record: SearchRecord, query: string) => {
+      const article = document.createElement("article"); article.className = "listing-card relative flex h-full flex-col border-t border-line py-6"; article.dataset.listingId = record.id;
+      const badges = document.createElement("div"); badges.className = "flex flex-wrap items-center gap-2 text-xs font-medium";
+      const state = document.createElement("span"); state.className = `rounded px-2 py-1 status-${record.status}`; state.textContent = record.status.replaceAll("-", " ");
+      const kind = document.createElement("span"); kind.className = "rounded bg-soft px-2 py-1 text-muted"; kind.textContent = record.resourceType.replaceAll("-", " "); badges.append(state, kind);
+      const provider = document.createElement("p"); provider.className = "mt-5 text-sm font-medium text-muted"; appendHighlighted(provider, record.provider, query);
+      const heading = document.createElement("h2"); heading.className = "mt-1 text-xl font-semibold leading-7 text-ink";
+      const link = document.createElement("a"); link.href = record.canonicalUrl; link.className = "after:absolute after:inset-0"; appendHighlighted(link, record.title, query); heading.append(link);
+      const description = document.createElement("p"); description.className = "mt-3 line-clamp-3 text-sm leading-6 text-muted"; description.textContent = record.description;
+      const benefit = document.createElement("p"); benefit.className = "mt-4 text-sm font-medium text-ink"; benefit.textContent = record.benefit;
+      const facts = document.createElement("p"); facts.className = "mt-auto pt-6 text-xs text-muted"; facts.textContent = `${record.regions.join(", ") || "Region not structured"} · Reviewed ${record.reviewDate}`;
+      article.append(badges, provider, heading, description, benefit, facts); return article;
+    };
+    const setParams = () => {
+      const url = new URL(location.href);
+      const values: Array<[string, string]> = [["q", input.value.trim().toLowerCase()], ["category", category.value], ["type", type.value], ["status", status.value], ["region", region.value], ["sort", sort.value === "relevance" ? "" : sort.value], ["archived", archived.checked ? "1" : ""]];
+      for (const [key, value] of values) value ? url.searchParams.set(key, value) : url.searchParams.delete(key);
+      history.replaceState(null, "", `${url.pathname}${url.search}`);
+    };
+    const update = async (reset = true) => {
+      if (reset) shown = PAGE_SIZE;
+      const all = await loadIndex(); const query = input.value.trim();
+      let filtered = all.map((record) => ({ ...record, score: score(record, query) })).filter((record) => record.score! >= 0 && (!category.value || record.category === category.value) && (!type.value || record.resourceType === type.value) && (!status.value || record.status === status.value) && (!region.value || record.regions.includes(region.value)) && (archived.checked || !["expired", "disputed", "archived"].includes(record.status)));
+      filtered.sort((left, right) => sort.value === "alphabetical" ? left.title.localeCompare(right.title) : sort.value === "provider" ? left.provider.localeCompare(right.provider) || left.title.localeCompare(right.title) : sort.value === "reviewed" ? right.reviewDate.localeCompare(left.reviewDate) : sort.value === "featured" ? Number(right.sponsored) - Number(left.sponsored) : query ? right.score! - left.score! || left.title.localeCompare(right.title) : (priority.get(left.resourceType) ?? 99) - (priority.get(right.resourceType) ?? 99) || right.reviewDate.localeCompare(left.reviewDate));
+      grid.replaceChildren(...filtered.slice(0, shown).map((record) => resultCard(record, query)));
+      count.textContent = `${filtered.length} ${filtered.length === 1 ? "record" : "records"}`; empty.classList.toggle("hidden", filtered.length !== 0); loadMore.classList.toggle("hidden", shown >= filtered.length); setParams();
+    };
+    const params = new URLSearchParams(location.search);
+    for (const [element, key] of [[input, "q"], [category, "category"], [type, "type"], [status, "status"], [region, "region"], [sort, "sort"]] as const) if ([...element instanceof HTMLSelectElement ? element.options : []].length === 0 || [...(element as HTMLSelectElement).options].some((option) => option.value === params.get(key))) element.value = params.get(key) ?? element.value;
+    archived.checked = params.get("archived") === "1";
+    let debounce = 0;
+    input.addEventListener("input", () => { window.clearTimeout(debounce); debounce = window.setTimeout(() => void update(), 120); });
+    for (const element of [category, type, status, region, sort, archived]) element.addEventListener("change", () => void update());
+    form.addEventListener("submit", (event) => { event.preventDefault(); void update(); });
+    loadMore.addEventListener("click", () => { shown += PAGE_SIZE; void update(false); });
+    clear.addEventListener("click", () => { input.value = ""; category.value = ""; type.value = ""; status.value = ""; region.value = ""; sort.value = "relevance"; archived.checked = false; void update(); input.focus(); });
+    if ([...params.keys()].length) void update();
   </script>
 </BaseLayout>

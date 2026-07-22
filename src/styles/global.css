@@ -49,7 +49,11 @@ a { text-underline-offset: 3px; }
 }
 .status-active { color: #176b43; background: #e7f6ee; }
 .status-limited, .status-waitlist { color: #825313; background: #fff4d6; }
-.status-unconfirmed, .status-disputed, .status-expired { color: #9b2c2c; background: #fdecec; }
+.status-unconfirmed { color: #5f4b8b; background: #f0ebff; }
+.status-disputed { color: #9b2c2c; background: #fdecec; border: 1px dashed currentColor; }
+.status-expired, .status-closed, .status-archived { color: #4b5563; background: #e5e7eb; }
+.status-upcoming { color: #155e75; background: #cffafe; }
+.status-temporarily-unavailable { color: #7c2d12; background: #ffedd5; }
 .review-card { touch-action: pan-y; transition: transform 180ms ease; }
 .moderation-dialog {
   margin: auto;
@@ -81,10 +85,8 @@ body:has(.moderation-dialog[open]) { overflow: hidden; }
 }
 
 .theme-toggle {
-  position: fixed;
-  z-index: 50;
-  left: max(1rem, env(safe-area-inset-left));
-  bottom: max(1rem, env(safe-area-inset-bottom));
+  position: relative;
+  z-index: 10;
   display: grid;
   width: 3rem;
   height: 3rem;
@@ -111,10 +113,6 @@ html[data-theme="dark"] .theme-icon-sun {
   opacity: 1;
   transform: rotate(0) scale(1);
 }
-body:has(#mobile-actions:not(.hidden)) .theme-toggle {
-  bottom: calc(6rem + env(safe-area-inset-bottom));
-}
-
 :where(a, button, input, select, textarea, summary) {
   transition:
     color var(--motion-fast) ease,
@@ -154,9 +152,11 @@ body:has(#mobile-actions:not(.hidden)) .theme-toggle {
 html[data-theme="dark"] .status-active { color: #8ee0b5; background: #173b2b; }
 html[data-theme="dark"] .status-limited,
 html[data-theme="dark"] .status-waitlist { color: #f4cf78; background: #3a2d16; }
-html[data-theme="dark"] .status-unconfirmed,
-html[data-theme="dark"] .status-disputed,
-html[data-theme="dark"] .status-expired { color: #ffb0b0; background: #472329; }
+html[data-theme="dark"] .status-unconfirmed { color: #d8ccff; background: #332b4f; }
+html[data-theme="dark"] .status-disputed { color: #ffb0b0; background: #472329; }
+html[data-theme="dark"] .status-expired,
+html[data-theme="dark"] .status-closed,
+html[data-theme="dark"] .status-archived { color: #d1d5db; background: #374151; }
 html[data-theme="dark"] .bg-amber-50 { background-color: #332816; }
 html[data-theme="dark"] .text-amber-950,
 html[data-theme="dark"] .text-amber-900,

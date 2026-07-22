@@ -20,6 +20,8 @@ const textareaClass = `${fieldClass} resize-y`;
       <p class="mt-4 max-w-2xl leading-7 text-muted">
         Share a legitimate program with the public index. Every submission is checked by a moderator before publication.
       </p>
+      <p class="mt-2 text-sm text-muted">Estimated time: 6–10 minutes. A local draft of public listing fields is saved on this device.</p>
+      <p id="draft-status" class="mt-1 text-sm text-muted" aria-live="polite"></p>
     </div>
 
     <div class="mt-9 grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_25rem] lg:gap-14">
@@ -74,9 +76,9 @@ const textareaClass = `${fieldClass} resize-y`;
           </fieldset>
 
           <label class="mt-6 block">
-            <span class="text-sm font-medium">Tags <span class="font-normal text-muted">(optional)</span></span>
-            <input name="tags" maxlength="240" placeholder="open-source, remote, climate" aria-describedby="tags-help" class={fieldClass} />
-            <span id="tags-help" class="mt-2 block text-sm leading-6 text-muted">Comma-separated discovery terms, separate from categories.</span>
+            <span class="text-sm font-medium">Keywords <span class="font-normal text-muted">(optional; moderators finalize)</span></span>
+            <input name="tags" maxlength="240" placeholder="open-source, remote, climate" aria-label="Tags (optional)" aria-describedby="tags-help" class={fieldClass} />
+            <span id="tags-help" class="mt-2 block text-sm leading-6 text-muted">Add a few plain-language terms. Moderators may normalize them.</span>
           </label>
         </fieldset>
 
@@ -124,6 +126,7 @@ const textareaClass = `${fieldClass} resize-y`;
             <span class="text-sm font-medium">Organization website <span class="font-normal text-muted">(optional)</span></span>
             <input type="url" name="organization_website_url" maxlength="500" placeholder="https://example.org" class={fieldClass} />
           </label>
+          <p id="duplicate-warning" class="mt-4 hidden rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950" role="status" aria-live="polite"></p>
         </fieldset>
 
         <fieldset class="mt-10 border-t border-line pt-7">
@@ -189,6 +192,8 @@ const textareaClass = `${fieldClass} resize-y`;
 
     const form = document.querySelector<HTMLFormElement>("#submission-form");
     const status = document.querySelector<HTMLElement>("#form-status");
+    const draftStatus = document.querySelector<HTMLElement>("#draft-status");
+    const duplicateWarning = document.querySelector<HTMLElement>("#duplicate-warning");
     const categorySelect = document.querySelector<HTMLSelectElement>("#primary-category");
     const subcategoryPrompt = document.querySelector<HTMLElement>("#subcategory-prompt");
     const subcategoryGroups = [...document.querySelectorAll<HTMLElement>("[data-subcategory-group]")];
@@ -216,11 +221,57 @@ const textareaClass = `${fieldClass} resize-y`;
         ? field.value.trim()
         : "";
     };
+    const draftKey = "perkcommons-next-submission-draft-v1";
+    const draftFields = ["organization", "name", "primary_category", "tags", "description", "eligibility", "benefits", "location", "deadline", "source_url", "organization_website_url"];
+    const restoreDraft = () => {
+      if (!form) return;
+      try {
+        const saved = JSON.parse(localStorage.getItem(draftKey) ?? "null") as { fields?: Record<string, string>; subcategories?: string[] } | null;
+        if (!saved?.fields) return;
+        for (const name of draftFields) {
+          const field = form.elements.namedItem(name);
+          if ((field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement) && saved.fields[name] !== undefined) field.value = saved.fields[name]!;
+        }
+        for (const checkbox of form.querySelectorAll<HTMLInputElement>('input[name="subcategories"]')) checkbox.checked = saved.subcategories?.includes(checkbox.value) ?? false;
+        if (draftStatus) draftStatus.textContent = "Local draft restored.";
+      } catch { localStorage.removeItem(draftKey); }
+    };
+    const saveDraft = () => {
+      if (!form) return;
+      try {
+        localStorage.setItem(draftKey, JSON.stringify({
+          fields: Object.fromEntries(draftFields.map((name) => [name, valueOf(name)])),
+          subcategories: [...form.querySelectorAll<HTMLInputElement>('input[name="subcategories"]:checked')].map((field) => field.value),
+        }));
+        if (draftStatus) draftStatus.textContent = "Draft saved locally.";
+      } catch { if (draftStatus) draftStatus.textContent = "Local draft could not be saved."; }
+    };
 
     const normalizedTags = () => valueOf("tags")
       .split(",")
       .map((tag) => tag.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))
       .filter((tag, index, values) => tag && values.indexOf(tag) === index);
+    let duplicateIndex: Array<{ provider: string; title: string; destinationUrl: string; canonicalUrl: string }> | null = null;
+    const checkDuplicate = async () => {
+      const provider = valueOf("organization").toLowerCase();
+      const title = valueOf("name").toLowerCase();
+      const source = valueOf("source_url");
+      if ((!provider || !title) && !source) return;
+      try {
+        duplicateIndex ??= ((await (await fetch("/catalog-index.json")).json()) as { records: typeof duplicateIndex }).records;
+        const match = duplicateIndex?.find((record) =>
+          (provider && title && record.provider.toLowerCase() === provider && record.title.toLowerCase() === title) ||
+          (source && record.destinationUrl === source),
+        );
+        if (!duplicateWarning) return;
+        duplicateWarning.classList.toggle("hidden", !match);
+        duplicateWarning.replaceChildren();
+        if (match) {
+          duplicateWarning.append("A similar published record may already exist. ");
+          const link = document.createElement("a"); link.href = match.canonicalUrl; link.textContent = "Review the existing record"; duplicateWarning.append(link, ". You can continue if this is an update or a distinct program.");
+        }
+      } catch { /* Duplicate hints are non-blocking. */ }
+    };
 
     const renderChips = (container: HTMLElement | null, labels: string[], style: "soft" | "outline") => {
       if (!container) return;
@@ -290,8 +341,15 @@ const textareaClass = `${fieldClass} resize-y`;
       updateSubcategories();
       updatePreview();
     });
-    form?.addEventListener("input", updatePreview);
-    form?.addEventListener("change", updatePreview);
+    let draftTimer = 0;
+    const updateAndSave = () => { updatePreview(); window.clearTimeout(draftTimer); draftTimer = window.setTimeout(saveDraft, 250); };
+    form?.addEventListener("input", updateAndSave);
+    form?.addEventListener("change", updateAndSave);
+    restoreDraft();
+    for (const name of ["organization", "name", "source_url"]) {
+      const field = form?.elements.namedItem(name);
+      if (field instanceof HTMLElement) field.addEventListener("blur", () => void checkDuplicate());
+    }
     updateSubcategories();
     updatePreview();
 
@@ -361,6 +419,8 @@ const textareaClass = `${fieldClass} resize-y`;
           );
         }
         form.reset();
+        try { localStorage.removeItem(draftKey); } catch {}
+        if (draftStatus) draftStatus.textContent = "Local draft cleared after submission.";
         updateSubcategories();
         updatePreview();
         if (status) status.textContent = "Submitted. A moderator will review the evidence before publication.";

@@ -43,7 +43,7 @@ const turnstileKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY;
       <div>
         <div class="flex flex-wrap gap-2 text-xs font-medium">
           <span class="rounded px-2 py-1 status-{listing.status}"
-            >{statusLabel(listing.status)}</span
+            title={`Editorial availability state: ${statusLabel(listing.status)}`}>{statusLabel(listing.status)}</span
           ><a
             href={`/categories/${listing.category}/`}
             class="rounded bg-soft px-2 py-1 text-muted"
@@ -97,13 +97,28 @@ const turnstileKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY;
             href={listing.officialUrl}
             rel="noopener"
             class="inline-flex items-center gap-2 rounded-md bg-action px-5 py-3 font-medium text-white no-underline"
-            >Visit official program <ArrowUpRight size={18} /></a
+            >Open listing destination <ArrowUpRight size={18} /></a
           ><a
             href={listing.sourceUrl}
             rel="noopener"
             class="inline-flex items-center gap-2 rounded-md border border-line bg-surface px-5 py-3 font-medium no-underline"
-            >Review source <ArrowUpRight size={18} /></a>
+            >Overview evidence <ArrowUpRight size={18} /></a>
         </div>
+        <section class="mt-8 border-t border-line pt-8" aria-labelledby="record-tools-heading">
+          <h2 id="record-tools-heading" class="text-xl font-semibold">Use this record</h2>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <button id="bookmark-record" type="button" class="min-h-11 rounded-md border border-line bg-surface px-4 text-sm font-medium">Bookmark locally</button>
+            <button id="compare-record" type="button" class="min-h-11 rounded-md border border-line bg-surface px-4 text-sm font-medium">Add to comparison</button>
+            <button id="copy-record-link" type="button" class="min-h-11 rounded-md border border-line bg-surface px-4 text-sm font-medium">Copy link</button>
+            <button id="export-record" type="button" data-record={JSON.stringify(listing)} class="min-h-11 rounded-md border border-line bg-surface px-4 text-sm font-medium">Export JSON</button>
+          </div>
+          <p id="record-tool-status" class="mt-3 text-sm text-muted" role="status" aria-live="polite"></p>
+        </section>
+        <section class="mt-8 border-t border-line pt-8">
+          <h2 class="text-xl font-semibold">Evidence and change history</h2>
+          <p class="mt-3 leading-7 text-muted">The v1 record cites overview evidence checked on {formatDate(listing.reviewDate)}. Separate eligibility, deadline, pricing, regional-restriction and application evidence have not yet been structured.</p>
+          <p class="mt-3 leading-7 text-muted">Git preserves the public record history. Structured supersession and tombstone history will appear after v2 human review.</p>
+        </section>
       </div>
       <aside
         class="h-fit border-t-2 border-ink bg-surface p-6"
@@ -335,6 +350,43 @@ const turnstileKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY;
         await turnstile?.reset();
         if (button) button.disabled = false;
       }
+    });
+  </script>
+  <script is:inline define:vars={{ listingId: listing.id, listingTitle: listing.title }}>
+    const toolStatus = document.querySelector("#record-tool-status");
+    const say = (message) => { if (toolStatus) toolStatus.textContent = message; };
+    const bookmark = document.querySelector("#bookmark-record");
+    const compare = document.querySelector("#compare-record");
+    const copy = document.querySelector("#copy-record-link");
+    const exportButton = document.querySelector("#export-record");
+    bookmark?.addEventListener("click", () => {
+      try {
+        const values = new Set(JSON.parse(localStorage.getItem("perkcommons-bookmarks") || "[]"));
+        values.has(listingId) ? values.delete(listingId) : values.add(listingId);
+        localStorage.setItem("perkcommons-bookmarks", JSON.stringify([...values]));
+        bookmark.textContent = values.has(listingId) ? "Remove local bookmark" : "Bookmark locally";
+        say(values.has(listingId) ? "Saved on this device." : "Local bookmark removed.");
+      } catch { say("Bookmark storage is unavailable in this browser."); }
+    });
+    compare?.addEventListener("click", () => {
+      try {
+        const values = new Set(JSON.parse(localStorage.getItem("perkcommons-compare") || "[]"));
+        if (!values.has(listingId) && values.size >= 4) { say("Comparison is limited to four records."); return; }
+        values.has(listingId) ? values.delete(listingId) : values.add(listingId);
+        localStorage.setItem("perkcommons-compare", JSON.stringify([...values]));
+        compare.textContent = values.has(listingId) ? "Remove from comparison" : "Add to comparison";
+        say(values.has(listingId) ? `${listingTitle} added to comparison.` : "Removed from comparison.");
+      } catch { say("Comparison storage is unavailable in this browser."); }
+    });
+    copy?.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(location.href); say("Link copied."); }
+      catch { say("Copy failed. Use your browser address bar."); }
+    });
+    exportButton?.addEventListener("click", () => {
+      const value = exportButton.getAttribute("data-record");
+      if (!value) return;
+      const blob = new Blob([`${JSON.stringify(JSON.parse(value), null, 2)}\n`], { type: "application/json" });
+      const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `${listingId}.json`; link.click(); URL.revokeObjectURL(link.href); say("Record exported as JSON.");
     });
   </script>
 </BaseLayout>

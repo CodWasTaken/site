@@ -61,21 +61,19 @@ test("directory filters records and preserves a stable layout", async ({
   await page.goto("/opportunities/?category=startup-benefits");
   await expect(page.getByLabel("Category")).toHaveValue("startup-benefits");
   await page.getByRole("searchbox", { name: "Search" }).fill("Microsoft");
-  await expect(page.getByText("1 opportunity", { exact: true })).toBeVisible();
+  await expect(page.getByText("1 record", { exact: true })).toBeVisible();
   await expect(page).toHaveURL(/category=startup-benefits/);
   await expect(page).toHaveURL(/q=microsoft/);
   await expect(
     page.locator('a[href="/opportunities/microsoft-for-startups-founders-hub/"]').first(),
   ).toBeVisible();
-  await expect(
-    page.getByText("Notion for Education", { exact: true }),
-  ).toBeHidden();
+  await expect(page.getByText("Notion for Education", { exact: true })).toHaveCount(0);
   await page.screenshot({
     path: testInfo.outputPath("filtered-directory.png"),
     fullPage: true,
   });
   await page.getByRole("button", { name: "Clear filters" }).click();
-  await expect(page.locator("#count")).toHaveText(/^\d+ opportunities$/);
+  await expect(page.locator("#count")).toHaveText(/^\d+ records$/);
   await expect(page).toHaveURL(/\/opportunities\/$/);
 });
 
@@ -116,21 +114,18 @@ test("mobile navigation opens and remains keyboard accessible", async ({
       .getByRole("link", { name: "Submit an opportunity" }),
   ).toBeVisible();
   await expect(
-    page
-      .getByRole("navigation", { name: "Mobile navigation" })
-      .getByRole("link", { name: "Moderator sign in" }),
-  ).toHaveAttribute("href", "/moderator-login/");
+    page.getByRole("navigation", { name: "Mobile navigation" }).getByRole("link", { name: "Moderator sign in" }),
+  ).toHaveCount(0);
 });
 
-test("primary navigation exposes moderator sign in", async ({ page }, testInfo) => {
+test("moderator access is available in the footer, not prominent public navigation", async ({ page }, testInfo) => {
   test.skip(
     testInfo.project.name !== "desktop",
     "Desktop navigation is hidden at mobile widths.",
   );
   await page.goto("/");
-  const signIn = page
-    .getByRole("navigation", { name: "Primary navigation" })
-    .getByRole("link", { name: "Moderator sign in" });
+  await expect(page.getByRole("navigation", { name: "Primary navigation" }).getByRole("link", { name: "Moderator sign in" })).toHaveCount(0);
+  const signIn = page.locator("footer").getByRole("link", { name: "Moderator sign in" });
   await expect(signIn).toBeVisible();
   await expect(signIn).toHaveAttribute("href", "/moderator-login/");
   const bounds = await signIn.boundingBox();

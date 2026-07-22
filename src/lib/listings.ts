@@ -1,5 +1,6 @@
 import { readFile, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
+import { getDataRepositoryRoot } from "./data-path";
 import {
   normalizeCategoryId,
   normalizeSubcategories,
@@ -36,7 +37,7 @@ export async function getListings(): Promise<Listing[]> {
   if (cache) return cache;
   const directory = process.env.PERKCOMMONS_DATA_PATH
     ? resolve(process.env.PERKCOMMONS_DATA_PATH)
-    : resolve(process.cwd(), ".data/opportunities");
+    : resolve(await getDataRepositoryRoot(), "opportunities");
   const files = (await readdir(directory)).filter((file) => file.endsWith(".json") && !file.startsWith("_"));
   cache = await Promise.all(
     files.map(async (file) => {
