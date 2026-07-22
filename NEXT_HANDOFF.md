@@ -53,8 +53,7 @@ No branch or commit was pushed during this project.
 | site | `npm run check` | Astro and TypeScript checks passed |
 | site | `npm test` | 36 passed, 0 failed |
 | site | `npm run build` | 1,095 static routes built; 1,068 detail pages indexed |
-| site | `npm run test:browser` | 49 passed, 4 intentionally skipped; one screenshot protocol failure after assertions |
-| site | isolated browser reruns | submission 2/2 passed; screenshot case 1/1 passed |
+| site | `npm run test:browser` | final full Chromium desktop/mobile run: 50 passed, 4 intentionally skipped, 0 failed |
 | site | `npx wrangler deploy --dry-run --outdir /tmp/perkcommons-next-wrangler-dry-run` | bundled 3,356 assets and exited without authentication or deployment |
 | branding | `jq empty` plus SVG presence checks | passed |
 | docs | exact offline Lychee workflow | not run: Lychee is not installed locally |

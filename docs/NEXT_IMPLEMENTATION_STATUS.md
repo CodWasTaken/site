@@ -66,8 +66,7 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` implemented, `[t]` tested, `
 - [t] Clean installs: `npm ci` completed in data and site without using credentials.
 - [t] Site: `npm test` — 36/36 passed after changes.
 - [t] Site: `npm run build` — 1,095 static routes built; Pagefind indexed 1,068 detail pages.
-- [t] Browser: submission regression rerun — 2/2 passed after rebuilding; screenshot-flake rerun — 1/1 passed.
-- [~] Full browser suite: 49 passed and 4 skipped; one post-assertion Chromium screenshot capture failed at the protocol layer and passed immediately in isolation. A final full rerun remains desirable.
+- [t] Browser: final full Chromium desktop/mobile suite — 50 passed, 4 intentionally skipped, 0 failed.
 - [t] Wrangler 4.112.0 dry run bundled 3,356 static assets and exited without authentication or deployment.
 - [t] Branding JSON/SVG workflow checks passed locally.
 - [b] Docs' exact offline Lychee check was not executable locally because the Lychee binary is not installed.
