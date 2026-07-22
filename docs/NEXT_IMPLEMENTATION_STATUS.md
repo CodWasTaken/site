@@ -67,7 +67,7 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` implemented, `[t]` tested, `
 - [t] Site: `npm test` — 36/36 passed after changes.
 - [t] Site: `npm run build` — 1,095 static routes built; Pagefind indexed 1,068 detail pages.
 - [t] Browser: final full Chromium desktop/mobile suite — 50 passed, 4 intentionally skipped, 0 failed.
-- [t] Wrangler 4.112.0 dry run bundled 3,356 static assets and exited without authentication or deployment.
+- [t] Wrangler 4.113.0 dry run bundled 3,356 static assets and exited without authentication or deployment.
 - [t] Branding JSON/SVG workflow checks passed locally.
 - [b] Docs' exact offline Lychee check was not executable locally because the Lychee binary is not installed.
 - [t] Data dependency audit reports zero known vulnerabilities after updating the transitive `fast-uri` lock.
