@@ -1,0 +1,8 @@
+{
+  "siteVersion": "0.2.0-next",
+  "dataSchemaVersion": "1+2.0",
+  "taxonomyVersion": "1",
+  "minimumMigration": "202607220001_next_foundation",
+  "dataCommit": "<exact-data-sha>",
+  "siteCommit": "<exact-site-sha>"
+}
