@@ -34,7 +34,7 @@ The site's nested `.data` clone is also on `next/schema-v2`, with the personal d
 Changes are committed locally using narrowly scoped conventional subjects. Run the following in each fork for immutable commit IDs:
 
 ```bash
-git log --oneline upstream/main..HEAD
+git log --oneline origin/main..HEAD
 ```
 
 No branch or commit was pushed during this project.
@@ -112,7 +112,7 @@ Transfer is prohibited until the owner explicitly states Build Week is over and 
 1. Re-verify the authorization and record its scope.
 2. Fetch official upstreams without changing their settings or branches.
 3. Create new, focused official integration branches; do not merge the experimental branches wholesale.
-4. Review `git log upstream/main..HEAD` and cherry-pick only approved, independently reviewable commits in dependency order: schema/data tooling, site consumption, Worker safety, moderation migration, then documentation.
+4. Fetch the authorized official upstream, review both `git log origin/main..HEAD` and `git log upstream/main..HEAD`, then cherry-pick only approved, independently reviewable commits in dependency order: schema/data tooling, site consumption, Worker safety, moderation migration, then documentation.
 5. Replace fork identifiers only through a reviewed configuration change. Do not copy fork placeholders or isolated resource IDs into production.
 6. Regenerate artifacts and reports from the exact approved data revision.
 7. Run clean installs, checks, unit tests, build, browser/accessibility suites, SQL integration tests, and Wrangler dry run.
