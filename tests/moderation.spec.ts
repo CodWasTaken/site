@@ -294,6 +294,10 @@ test("approve, decline, flag, keyboard shortcuts, and undo use authenticated API
   ).toBeVisible();
   const approveDialog = page.getByRole("dialog", { name: "Normalize approved listing" });
   await approveDialog.getByLabel("Primary category").selectOption("open-source");
+  await approveDialog.getByLabel("Resource type").selectOption("opportunity");
+  await approveDialog.getByLabel("Include in default search").selectOption("true");
+  await approveDialog.locator('[name="availability_status"]').selectOption("open");
+  await approveDialog.getByLabel("Program exists").check();
   await approveDialog
     .locator('[data-approval-subcategory-group="open-source"]')
     .getByLabel("Mentorship programs")
@@ -308,6 +312,10 @@ test("approve, decline, flag, keyboard shortcuts, and undo use authenticated API
       primary_category: "open-source",
       subcategories: ["mentorship-programs"],
       tags: ["mentorship", "contributors"],
+      resource_type: "opportunity",
+      default_search_eligible: "true",
+      availability_status: "open",
+      claims_checked: ["program-exists"],
     },
   });
   await page.getByRole("button", { name: "Undo" }).click();

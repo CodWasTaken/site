@@ -65,6 +65,20 @@ const QUEUES = new Set([
   "rejected",
   "published",
 ]);
+const RESOURCE_TYPES = new Set([
+  "opportunity", "resource", "benefit", "program", "event", "funding",
+  "fellowship", "competition", "community", "learning-resource",
+  "public-dataset", "general-free-product",
+]);
+const AVAILABILITY_STATUSES = new Set([
+  "open", "rolling", "upcoming", "limited", "waitlist",
+  "temporarily-unavailable", "closed", "expired", "unconfirmed",
+  "disputed", "archived",
+]);
+const DEADLINE_TYPES = new Set(["fixed", "rolling", "periodic", "unknown", "none"]);
+const REVIEW_CLAIMS = new Set([
+  "program-exists", "eligibility", "benefit", "application-url", "deadline", "geography",
+]);
 
 const asRecord = (value: unknown): Record<string, unknown> => {
   if (!value || typeof value !== "object" || Array.isArray(value))
@@ -225,6 +239,8 @@ const normalizedData = (value: unknown): Record<string, unknown> => {
   );
   const subcategories = normalized.subcategories ?? [];
   const tags = normalized.tags ?? [];
+  const countries = normalized.countries ?? [];
+  const claimsChecked = normalized.claims_checked ?? [];
   if (
     !primaryCategory ||
     !Array.isArray(subcategories) ||
@@ -246,6 +262,56 @@ const normalizedData = (value: unknown): Record<string, unknown> => {
     new Set(tags).size !== tags.length
   )
     throw new RequestError("Tags are invalid.", 400, "validation_failed");
+  if (
+    !Array.isArray(countries) || countries.length > 30 ||
+    countries.some((country) => typeof country !== "string" || !/^[A-Z]{2}$/.test(country)) ||
+    new Set(countries).size !== countries.length
+  )
+    throw new RequestError("Countries are invalid.", 400, "validation_failed");
+  if (
+    !Array.isArray(claimsChecked) || claimsChecked.length === 0 ||
+    claimsChecked.some((claim) => typeof claim !== "string" || !REVIEW_CLAIMS.has(claim)) ||
+    new Set(claimsChecked).size !== claimsChecked.length
+  )
+    throw new RequestError("Select the claims checked during review.", 400, "validation_failed");
+  const triState = (key: string): boolean | null => {
+    const value = normalized[key];
+    if (value === "unknown" || value === null || value === undefined) return null;
+    if (value === "true" || value === true) return true;
+    if (value === "false" || value === false) return false;
+    throw new RequestError(`${key} is invalid.`, 400, "validation_failed");
+  };
+  const resourceType = requiredChoice(normalized.resource_type, RESOURCE_TYPES, "Resource type");
+  const defaultSearchEligible = triState("default_search_eligible");
+  if (defaultSearchEligible === null)
+    throw new RequestError("Default search eligibility requires an explicit decision.", 400, "validation_failed");
+  const availabilityStatus = requiredChoice(normalized.availability_status, AVAILABILITY_STATUSES, "Availability status");
+  const deadlineType = requiredChoice(normalized.deadline_type, DEADLINE_TYPES, "Deadline type");
+  const validDate = (date: string): boolean => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+    const parsed = new Date(`${date}T00:00:00Z`);
+    return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === date;
+  };
+  const deadline = text("deadline", 10, false);
+  if (deadline && !validDate(deadline))
+    throw new RequestError("Deadline is invalid.", 400, "validation_failed");
+  if (deadlineType === "fixed" && !deadline)
+    throw new RequestError("A fixed deadline requires a date.", 400, "validation_failed");
+  const sponsored = triState("sponsored");
+  const sponsorshipType = text("sponsorship_type", 100, false);
+  const sponsorshipDisclosure = text("sponsorship_disclosure", 1_000, false);
+  if (sponsored === true && (!sponsorshipType || !sponsorshipDisclosure))
+    throw new RequestError("Sponsored records require a type and public disclosure.", 400, "validation_failed");
+  const providerUrl = safeHttpsUrl(normalized.provider_url, "Provider URL", false);
+  const programUrl = safeHttpsUrl(normalized.program_url, "Program URL") as string;
+  const applicationUrl = safeHttpsUrl(normalized.application_url, "Application URL", false);
+  const nextReviewAt = text("next_review_at", 10, false);
+  if (nextReviewAt && !validDate(nextReviewAt))
+    throw new RequestError("Next review date is invalid.", 400, "validation_failed");
+  const location = text("location", 120, false);
+  const physicalLocations = location && !["global", "remote", "online"].includes(location.toLowerCase())
+    ? [location]
+    : [];
   return {
     title: text("title", 140),
     organization: text("organization", 100),
@@ -256,14 +322,27 @@ const normalizedData = (value: unknown): Record<string, unknown> => {
     description: text("description", 2_000),
     eligibility: text("eligibility", 2_000),
     benefits: text("benefits", 2_000, false),
-    location: text("location", 120, false),
-    deadline: text("deadline", 10, false),
-    source_url: safeHttpsUrl(normalized.source_url, "Source URL"),
-    organization_website_url: safeHttpsUrl(
-      normalized.organization_website_url,
-      "Organization website",
-      false,
-    ),
+    location,
+    deadline,
+    source_url: programUrl,
+    organization_website_url: providerUrl,
+    resource_type: resourceType,
+    default_search_eligible: defaultSearchEligible,
+    availability_status: availabilityStatus,
+    status_reason: text("status_reason", 1_000, false),
+    deadline_type: deadlineType,
+    global: triState("global"),
+    remote: triState("remote"),
+    countries,
+    physical_locations: physicalLocations,
+    provider_url: providerUrl,
+    program_url: programUrl,
+    application_url: applicationUrl,
+    sponsored,
+    sponsorship_type: sponsorshipType,
+    sponsorship_disclosure: sponsorshipDisclosure,
+    claims_checked: claimsChecked,
+    next_review_at: nextReviewAt,
   };
 };
 

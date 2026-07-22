@@ -613,8 +613,23 @@ function populateApproval() {
   assign("benefits", submission.benefits);
   assign("location", submission.location);
   assign("deadline", submission.deadline);
-  assign("source_url", submission.source_url);
-  assign("organization_website_url", submission.organization_website_url);
+  assign("deadline_type", submission.deadline ? "fixed" : "unknown");
+  assign("resource_type", "");
+  assign("default_search_eligible", "");
+  assign("availability_status", "");
+  assign("status_reason", "");
+  assign("global", submission.location?.trim().toLowerCase() === "global" ? "true" : "unknown");
+  assign("remote", submission.location?.trim().toLowerCase() === "remote" ? "true" : "unknown");
+  assign("countries", "");
+  assign("program_url", submission.source_url);
+  assign("provider_url", submission.organization_website_url);
+  assign("application_url", "");
+  assign("next_review_at", "");
+  assign("sponsored", "unknown");
+  assign("sponsorship_type", "");
+  assign("sponsorship_disclosure", "");
+  form.querySelectorAll<HTMLInputElement>('input[name="claims_checked"]')
+    .forEach((input) => { input.checked = false; });
   openDialog("#approve-dialog");
 }
 
@@ -864,6 +879,10 @@ element<HTMLFormElement>("#approve-form").addEventListener(
           .replace(/^-|-$/g, ""),
       )
       .filter((tag, index, values) => tag && values.indexOf(tag) === index);
+    const countries = String(data.get("countries") ?? "")
+      .split(",")
+      .map((country) => country.trim().toUpperCase())
+      .filter((country, index, values) => country && values.indexOf(country) === index);
     void performAction("approve", {
       normalized: {
         title: data.get("title"),
@@ -877,8 +896,22 @@ element<HTMLFormElement>("#approve-form").addEventListener(
         benefits: data.get("benefits"),
         location: data.get("location"),
         deadline: data.get("deadline"),
-        source_url: data.get("source_url"),
-        organization_website_url: data.get("organization_website_url"),
+        resource_type: data.get("resource_type"),
+        default_search_eligible: data.get("default_search_eligible"),
+        availability_status: data.get("availability_status"),
+        status_reason: data.get("status_reason"),
+        deadline_type: data.get("deadline_type"),
+        global: data.get("global"),
+        remote: data.get("remote"),
+        countries,
+        program_url: data.get("program_url"),
+        provider_url: data.get("provider_url"),
+        application_url: data.get("application_url"),
+        claims_checked: data.getAll("claims_checked").map(String),
+        next_review_at: data.get("next_review_at"),
+        sponsored: data.get("sponsored"),
+        sponsorship_type: data.get("sponsorship_type"),
+        sponsorship_disclosure: data.get("sponsorship_disclosure"),
       },
     });
   },

@@ -20,10 +20,25 @@ const payload: PublicationPayload = {
   description: "Funding for maintainers of open public infrastructure projects.",
   eligibility: "Open-source maintainers worldwide may apply.",
   benefits: "$10,000 in unrestricted project funding.",
-  location: "Global",
+  resource_type: "funding",
+  default_search_eligible: true,
+  availability_status: "open",
+  status_reason: "Applications are open on the provider site.",
+  deadline_type: "fixed",
   deadline: "2026-12-01",
-  source_url: "https://example.org/grant",
-  organization_website_url: "https://example.org",
+  global: true,
+  remote: true,
+  countries: [],
+  physical_locations: [],
+  provider_url: "https://example.org/",
+  program_url: "https://example.org/grant",
+  application_url: "https://example.org/grant/apply",
+  sponsored: false,
+  sponsorship_type: null,
+  sponsorship_disclosure: null,
+  claims_checked: ["program-exists", "eligibility", "benefit", "application-url", "deadline", "geography"],
+  next_review_at: "2027-01-15",
+  normalized_at: "2026-07-19T12:00:00Z",
 };
 
 const env = {
@@ -46,25 +61,20 @@ test("publication data uses stable IDs and the public data schema", () => {
   const listingId = publicationListingId(payload);
   assert.equal(listingId, "example-foundation-open-infrastructure-grant-11111111");
   assert.ok(listingId.length <= 80);
-  assert.deepEqual(toPublishedOpportunity(payload, "2026-07-19"), {
-    id: listingId,
-    provider: "Example Foundation",
-    title: "Open Infrastructure Grant",
-    category: "funding",
-    subcategories: ["research-funding"],
-    tags: ["open-source"],
-    description: payload.description,
-    eligibility: payload.eligibility,
-    value: payload.benefits,
-    sourceUrl: payload.source_url,
-    officialUrl: payload.organization_website_url,
-    status: "active",
-    submissionType: "community",
-    sponsor: false,
-    reviewDate: "2026-07-19",
-    regions: ["Global"],
-    notes: "Submitted application deadline: 2026-12-01.",
-  });
+  const published = toPublishedOpportunity(payload);
+  assert.equal(published.schemaVersion, "2.0");
+  assert.equal(published.urls.providerUrl, payload.provider_url);
+  assert.equal(published.urls.programUrl, payload.program_url);
+  assert.equal(published.urls.applicationUrl, payload.application_url);
+  assert.equal(published.canonicalUrl, payload.program_url);
+  assert.equal(published.reviewProvenance.sourceFetchedAt, null);
+  assert.equal(published.availability.status, "open");
+  assert.equal(published.classification.defaultSearchEligible, true);
+  assert.equal(published.availability.closesAt, "2026-12-01");
+  assert.equal(published.geography.global, true);
+  assert.deepEqual(published.reviewProvenance.claimsChecked, payload.claims_checked);
+  assert.equal(published.reviewProvenance.reviewerReference, "role:moderator");
+  assert.equal(published.sponsorship.sponsored, false);
 });
 
 test("reviewers cannot start publication batches through the Worker API", async () => {

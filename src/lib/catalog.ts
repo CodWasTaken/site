@@ -30,6 +30,7 @@ export interface CatalogIndexRecord {
   reviewDate: string;
   sponsored: boolean;
   resourceType: CatalogResourceType;
+  defaultSearchEligible: boolean | null;
   canonicalUrl: string;
   destinationUrl: string;
   addedAt: string | null;
@@ -46,6 +47,7 @@ export interface DatasetMetadata {
 }
 
 export const resourceTypeFor = (listing: Listing): CatalogResourceType => {
+  if (listing.resourceType) return listing.resourceType as CatalogResourceType;
   const mapping: Partial<Record<Listing["category"], CatalogResourceType>> = {
     funding: "funding",
     fellowships: "fellowship",
@@ -67,7 +69,7 @@ export async function getCatalogIndex(): Promise<CatalogIndexRecord[]> {
     id: listing.id,
     provider: listing.provider,
     title: listing.title,
-    aliases: [],
+    aliases: listing.aliases ?? [],
     description: listing.description,
     eligibility: listing.eligibility,
     benefit: listing.value,
@@ -80,8 +82,9 @@ export async function getCatalogIndex(): Promise<CatalogIndexRecord[]> {
     reviewDate: listing.reviewDate,
     sponsored: listing.sponsor,
     resourceType: resourceTypeFor(listing),
+    defaultSearchEligible: listing.defaultSearchEligible ?? null,
     canonicalUrl: `/opportunities/${listing.id}/`,
-    destinationUrl: listing.officialUrl,
+    destinationUrl: listing.applicationUrl ?? listing.programUrl ?? listing.officialUrl,
     addedAt: null,
   }));
 }
@@ -115,4 +118,7 @@ export async function getDatasetMetadata(): Promise<DatasetMetadata> {
 }
 
 export const publicCatalogRecords = (records: CatalogIndexRecord[]) =>
-  records.filter((record) => !["expired", "disputed", "archived"].includes(record.status));
+  records.filter((record) =>
+    record.defaultSearchEligible !== false &&
+    !["expired", "disputed", "archived"].includes(record.status)
+  );

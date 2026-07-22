@@ -27,6 +27,9 @@ export async function getStaticPaths() {
 }
 const { listing } = Astro.props as { listing: Listing };
 const turnstileKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY;
+const isV2 = listing.schemaVersion === "2.0";
+const destinationUrl = listing.applicationUrl ?? listing.programUrl ?? listing.officialUrl;
+const destinationLabel = listing.applicationUrl ? "Open application" : "Open program";
 ---
 
 <BaseLayout
@@ -94,15 +97,23 @@ const turnstileKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY;
         }
         <div class="mt-10 flex flex-wrap gap-3">
           <a
-            href={listing.officialUrl}
+            href={destinationUrl}
             rel="noopener"
             class="inline-flex items-center gap-2 rounded-md bg-action px-5 py-3 font-medium text-white no-underline"
-            >Open listing destination <ArrowUpRight size={18} /></a
-          ><a
+            >{destinationLabel} <ArrowUpRight size={18} /></a
+          >{listing.programUrl && listing.programUrl !== destinationUrl && <a
+            href={listing.programUrl}
+            rel="noopener"
+            class="inline-flex items-center gap-2 rounded-md border border-line bg-surface px-5 py-3 font-medium no-underline"
+            >Program details <ArrowUpRight size={18} /></a>}{listing.providerUrl && listing.providerUrl !== destinationUrl && listing.providerUrl !== listing.programUrl && <a
+            href={listing.providerUrl}
+            rel="noopener"
+            class="inline-flex items-center gap-2 rounded-md border border-line bg-surface px-5 py-3 font-medium no-underline"
+            >Provider website <ArrowUpRight size={18} /></a>}{!isV2 && <a
             href={listing.sourceUrl}
             rel="noopener"
             class="inline-flex items-center gap-2 rounded-md border border-line bg-surface px-5 py-3 font-medium no-underline"
-            >Overview evidence <ArrowUpRight size={18} /></a>
+            >Overview evidence <ArrowUpRight size={18} /></a>}
         </div>
         <section class="mt-8 border-t border-line pt-8" aria-labelledby="record-tools-heading">
           <h2 id="record-tools-heading" class="text-xl font-semibold">Use this record</h2>
@@ -111,13 +122,18 @@ const turnstileKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY;
             <button id="compare-record" type="button" class="min-h-11 rounded-md border border-line bg-surface px-4 text-sm font-medium">Add to comparison</button>
             <button id="copy-record-link" type="button" class="min-h-11 rounded-md border border-line bg-surface px-4 text-sm font-medium">Copy link</button>
             <button id="export-record" type="button" data-record={JSON.stringify(listing)} class="min-h-11 rounded-md border border-line bg-surface px-4 text-sm font-medium">Export JSON</button>
+            {listing.deadline && <button id="add-deadline-calendar" type="button" class="min-h-11 rounded-md border border-line bg-surface px-4 text-sm font-medium">Add deadline to calendar</button>}
           </div>
           <p id="record-tool-status" class="mt-3 text-sm text-muted" role="status" aria-live="polite"></p>
         </section>
         <section class="mt-8 border-t border-line pt-8">
           <h2 class="text-xl font-semibold">Evidence and change history</h2>
-          <p class="mt-3 leading-7 text-muted">The v1 record cites overview evidence checked on {formatDate(listing.reviewDate)}. Separate eligibility, deadline, pricing, regional-restriction and application evidence have not yet been structured.</p>
-          <p class="mt-3 leading-7 text-muted">Git preserves the public record history. Structured supersession and tombstone history will appear after v2 human review.</p>
+          {isV2 ? <>
+            <p class="mt-3 leading-7 text-muted">Reviewed manually on {formatDate(listing.reviewDate)}. Checked claims: {listing.claimsChecked?.length ? listing.claimsChecked.join(", ") : "not published"}.</p>
+            <ul class="mt-4 space-y-2">{listing.evidenceUrls?.map((evidence) => <li><a href={evidence.url} rel="noopener" class="font-medium">{evidence.type.replaceAll("-", " ")} evidence</a>{evidence.claim ? ` — ${evidence.claim}` : ""}</li>)}</ul>
+            {listing.nextReviewAt && <p class="mt-3 text-sm text-muted">Next review due {formatDate(listing.nextReviewAt.slice(0, 10))}.</p>}
+          </> : <p class="mt-3 leading-7 text-muted">This legacy v1 record cites overview evidence checked on {formatDate(listing.reviewDate)}. Separate eligibility, deadline, pricing, regional-restriction and application evidence have not yet been structured.</p>}
+          <p class="mt-3 leading-7 text-muted">Git preserves the public record history. Removal and supersession records remain part of the public audit trail.</p>
         </section>
       </div>
       <aside
@@ -139,7 +155,10 @@ const turnstileKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY;
             </dt><dd class="mt-1.5 font-medium">
               {statusLabel(listing.status)}
             </dd>
-          </div><div>
+          </div>{listing.deadline && <div>
+            <dt class="flex items-center gap-2 text-muted"><CalendarDays size={16} /> Deadline</dt>
+            <dd class="mt-1.5 font-medium">{formatDate(listing.deadline.slice(0, 10))}</dd>
+          </div>}<div>
             <dt class="flex items-center gap-2 text-muted">
               <Globe2 size={16} /> Region
             </dt><dd class="mt-1.5 font-medium">
@@ -352,13 +371,14 @@ const turnstileKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY;
       }
     });
   </script>
-  <script is:inline define:vars={{ listingId: listing.id, listingTitle: listing.title }}>
+  <script is:inline define:vars={{ listingId: listing.id, listingTitle: listing.title, listingDeadline: listing.deadline ?? null }}>
     const toolStatus = document.querySelector("#record-tool-status");
     const say = (message) => { if (toolStatus) toolStatus.textContent = message; };
     const bookmark = document.querySelector("#bookmark-record");
     const compare = document.querySelector("#compare-record");
     const copy = document.querySelector("#copy-record-link");
     const exportButton = document.querySelector("#export-record");
+    const calendarButton = document.querySelector("#add-deadline-calendar");
     bookmark?.addEventListener("click", () => {
       try {
         const values = new Set(JSON.parse(localStorage.getItem("perkcommons-bookmarks") || "[]"));
@@ -387,6 +407,30 @@ const turnstileKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY;
       if (!value) return;
       const blob = new Blob([`${JSON.stringify(JSON.parse(value), null, 2)}\n`], { type: "application/json" });
       const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `${listingId}.json`; link.click(); URL.revokeObjectURL(link.href); say("Record exported as JSON.");
+    });
+    calendarButton?.addEventListener("click", () => {
+      if (!listingDeadline) return;
+      const escapeIcs = (value) => String(value)
+        .replaceAll("\\", "\\\\")
+        .replace(/[\r\n]+/g, " ")
+        .replaceAll(",", "\\,")
+        .replaceAll(";", "\\;");
+      const date = String(listingDeadline).slice(0, 10).replaceAll("-", "");
+      const next = new Date(`${String(listingDeadline).slice(0, 10)}T00:00:00Z`);
+      next.setUTCDate(next.getUTCDate() + 1);
+      const end = next.toISOString().slice(0, 10).replaceAll("-", "");
+      const content = [
+        "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//PerkCommons Next//EN",
+        "BEGIN:VEVENT", `UID:${listingId}@perkcommons.com`, `DTSTART;VALUE=DATE:${date}`,
+        `DTEND;VALUE=DATE:${end}`, `SUMMARY:${escapeIcs(listingTitle)}`,
+        `URL:${escapeIcs(location.href)}`, "END:VEVENT", "END:VCALENDAR",
+      ].join("\r\n");
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(new Blob([content], { type: "text/calendar" }));
+      link.download = `${listingId}-deadline.ics`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+      say("Calendar file downloaded.");
     });
   </script>
 </BaseLayout>

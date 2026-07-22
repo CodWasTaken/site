@@ -441,8 +441,8 @@ import { categoryDefinitions } from "../lib/taxonomy";
           aria-label="Close"><X size={20} /></button>
       </div>
       <p class="mt-2 text-sm leading-6 text-muted">
-        Approval stores a separate public-ready copy. It does not publish
-        automatically.
+        Approval creates a normalized public-ready record. An administrator
+        must include it in a validated publication batch before it appears publicly.
       </p>
       <div class="mt-5 grid gap-4 sm:grid-cols-2">
         <label class="sm:col-span-2"
@@ -475,11 +475,56 @@ import { categoryDefinitions } from "../lib/taxonomy";
           ></label
         >
         <label
+          ><span class="text-sm font-medium">Resource type</span><select
+            required
+            name="resource_type"
+            class="mt-1 min-h-11 w-full rounded-md border border-line px-3"
+          ><option value="">Select type</option>{[
+            "opportunity", "resource", "benefit", "program", "event", "funding",
+            "fellowship", "competition", "community", "learning-resource",
+            "public-dataset", "general-free-product",
+          ].map((value) => <option value={value}>{value.replaceAll("-", " ")}</option>)}</select></label
+        >
+        <label
+          ><span class="text-sm font-medium">Include in default search</span><select
+            required
+            name="default_search_eligible"
+            class="mt-1 min-h-11 w-full rounded-md border border-line px-3"
+          ><option value="">Select yes or no</option><option value="true">Yes</option><option value="false">No</option></select></label
+        >
+        <div>
+          <label for="approval-availability" class="text-sm font-medium">Availability</label><select
+            id="approval-availability"
+            required
+            name="availability_status"
+            class="mt-1 min-h-11 w-full rounded-md border border-line px-3"
+          ><option value="">Select current status</option>{[
+            "open", "rolling", "upcoming", "limited", "waitlist",
+            "temporarily-unavailable", "closed", "expired", "unconfirmed",
+            "disputed", "archived",
+          ].map((value) => <option value={value}>{value.replaceAll("-", " ")}</option>)}</select>
+        </div>
+        <label
+          ><span class="text-sm font-medium">Deadline type</span><select
+            required
+            name="deadline_type"
+            class="mt-1 min-h-11 w-full rounded-md border border-line px-3"
+          >{["fixed", "rolling", "periodic", "unknown", "none"].map((value) => <option value={value}>{value}</option>)}</select></label
+        >
+        <label
           ><span class="text-sm font-medium">Deadline</span><input
             type="date"
             name="deadline"
             class="mt-1 min-h-11 w-full rounded-md border border-line px-3"
           /></label
+        >
+        <label class="sm:col-span-2"
+          ><span class="text-sm font-medium">Status reason</span><textarea
+            name="status_reason"
+            rows="2"
+            maxlength="1000"
+            class="mt-1 w-full rounded-md border border-line p-3"
+          ></textarea></label
         >
         <fieldset class="sm:col-span-2">
           <legend class="text-sm font-medium">Subcategories</legend>
@@ -535,17 +580,79 @@ import { categoryDefinitions } from "../lib/taxonomy";
           /></label
         >
         <label
-          ><span class="text-sm font-medium">Official source</span><input
-            required
-            type="url"
-            name="source_url"
+          ><span class="text-sm font-medium">Global availability</span><select
+            name="global"
+            class="mt-1 min-h-11 w-full rounded-md border border-line px-3"
+          ><option value="unknown">Unknown</option><option value="true">Yes</option><option value="false">No</option></select></label
+        >
+        <label
+          ><span class="text-sm font-medium">Remote availability</span><select
+            name="remote"
+            class="mt-1 min-h-11 w-full rounded-md border border-line px-3"
+          ><option value="unknown">Unknown</option><option value="true">Yes</option><option value="false">No</option></select></label
+        >
+        <label
+          ><span class="text-sm font-medium">Country codes</span><input
+            name="countries"
+            maxlength="120"
+            placeholder="US, CA, PL"
             class="mt-1 min-h-11 w-full rounded-md border border-line px-3"
           /></label
         >
         <label class="sm:col-span-2"
-          ><span class="text-sm font-medium">Organization website</span><input
+          ><span class="text-sm font-medium">Program URL</span><input
+            required
             type="url"
-            name="organization_website_url"
+            name="program_url"
+            class="mt-1 min-h-11 w-full rounded-md border border-line px-3"
+          /></label
+        >
+        <label
+          ><span class="text-sm font-medium">Provider URL</span><input
+            type="url"
+            name="provider_url"
+            class="mt-1 min-h-11 w-full rounded-md border border-line px-3"
+          /></label
+        >
+        <label
+          ><span class="text-sm font-medium">Application URL</span><input
+            type="url"
+            name="application_url"
+            class="mt-1 min-h-11 w-full rounded-md border border-line px-3"
+          /></label
+        >
+        <fieldset class="sm:col-span-2">
+          <legend class="text-sm font-medium">Claims checked during review</legend>
+          <div class="mt-2 grid gap-2 sm:grid-cols-3">{[
+            ["program-exists", "Program exists"], ["eligibility", "Eligibility"],
+            ["benefit", "Benefit"], ["application-url", "Application URL"],
+            ["deadline", "Deadline"], ["geography", "Geography"],
+          ].map(([value, label]) => <label class="flex min-h-11 items-center gap-2 rounded border border-line px-3"><input type="checkbox" name="claims_checked" value={value} /><span>{label}</span></label>)}</div>
+        </fieldset>
+        <label
+          ><span class="text-sm font-medium">Next review date</span><input
+            type="date"
+            name="next_review_at"
+            class="mt-1 min-h-11 w-full rounded-md border border-line px-3"
+          /></label
+        >
+        <label
+          ><span class="text-sm font-medium">Sponsorship</span><select
+            name="sponsored"
+            class="mt-1 min-h-11 w-full rounded-md border border-line px-3"
+          ><option value="unknown">Unknown</option><option value="false">Not sponsored</option><option value="true">Sponsored</option></select></label
+        >
+        <label
+          ><span class="text-sm font-medium">Sponsorship type</span><input
+            name="sponsorship_type"
+            maxlength="100"
+            class="mt-1 min-h-11 w-full rounded-md border border-line px-3"
+          /></label
+        >
+        <label
+          ><span class="text-sm font-medium">Public sponsorship disclosure</span><input
+            name="sponsorship_disclosure"
+            maxlength="1000"
             class="mt-1 min-h-11 w-full rounded-md border border-line px-3"
           /></label
         >

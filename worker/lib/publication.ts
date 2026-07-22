@@ -1,6 +1,7 @@
 import { RequestError } from "./http";
 import {
   publicationListingId,
+  publicationPayloadIssues,
   toPublishedOpportunity,
   type PublicationPayload,
 } from "./publication-data";
@@ -114,10 +115,16 @@ export const startPublicationBatch = async (
     "publication_batch_payload",
     { p_batch_id: batchId },
   );
-  const reviewDate = new Date().toISOString().slice(0, 10);
-  const opportunities = payloads.map((payload) =>
-    toPublishedOpportunity(payload, reviewDate),
-  );
+  const incomplete = payloads
+    .map((payload) => ({ submissionId: payload.submission_id, fields: publicationPayloadIssues(payload) }))
+    .filter((item) => item.fields.length > 0);
+  if (incomplete.length > 0)
+    throw new RequestError(
+      `${incomplete.length} approved record(s) require semantic review before publication.`,
+      409,
+      "publication_requires_review",
+    );
+  const opportunities = payloads.map(toPublishedOpportunity);
   await saveListingIds(env, batchId, payloads);
   try {
     const pullRequest = await createPublicationPullRequest(
