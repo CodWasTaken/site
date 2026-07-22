@@ -74,6 +74,8 @@ const asRecord = (value: unknown): Record<string, unknown> => {
 
 const submissionSelect =
   "id,name,organization,categories,primary_category,subcategories,tags,description,eligibility,benefits,location,deadline,source_url,organization_website_url,submitter_name,submitter_email,submitter_notes,status,risk_score,flag_count,submission_country_code,created_at,updated_at,reviewed_at,published_at,last_action_at,decision_reason";
+const submissionSummarySelect =
+  "id,name,organization,primary_category,status,risk_score,flag_count,submission_country_code,created_at,updated_at";
 
 export async function createSession(
   request: Request,
@@ -128,6 +130,31 @@ export async function queue(request: Request, env: Env): Promise<Response> {
   const query = `/rest/v1/opportunity_submissions?status=eq.${status}${categoryFilter}&select=${submissionSelect}&order=created_at.asc&limit=50`;
   const { data } = await supabaseRequest<unknown[]>(env, query);
   return json({ queue: status, count: data.length, submissions: data });
+}
+
+export async function queueSummary(request: Request, env: Env): Promise<Response> {
+  await requireModerator(request, env);
+  const url = new URL(request.url);
+  const status = url.searchParams.get("status") ?? "pending";
+  const categoryParameter = url.searchParams.get("category");
+  const category = categoryParameter ? normalizeCategoryId(categoryParameter) : null;
+  if (!QUEUES.has(status)) throw new RequestError("Unknown moderation queue.", 400, "invalid_queue");
+  if (categoryParameter && !category) throw new RequestError("Unknown opportunity category.", 400, "invalid_category");
+  const limit = Math.min(50, Math.max(1, Number.parseInt(url.searchParams.get("limit") ?? "25", 10) || 25));
+  const after = url.searchParams.get("after");
+  if (after && Number.isNaN(Date.parse(after))) throw new RequestError("Queue cursor is invalid.", 400, "invalid_cursor");
+  const categoryFilter = category ? `&primary_category=eq.${category}` : "";
+  const cursorFilter = after ? `&created_at=gt.${encodeURIComponent(after)}` : "";
+  const query = `/rest/v1/opportunity_submissions?status=eq.${status}${categoryFilter}${cursorFilter}&select=${submissionSummarySelect}&order=created_at.asc,id.asc&limit=${limit}`;
+  const result = await supabaseRequest<Array<{ id: string; created_at: string }>>(env, query, { headers: { prefer: "count=exact" } });
+  const total = Number(result.response.headers.get("content-range")?.split("/")[1] ?? result.data.length);
+  return json({
+    queue: status,
+    total: Number.isFinite(total) ? total : result.data.length,
+    count: result.data.length,
+    nextCursor: result.data.length === limit ? result.data.at(-1)?.created_at ?? null : null,
+    submissions: result.data,
+  });
 }
 
 export async function submissionDetail(
@@ -313,7 +340,7 @@ export async function reports(request: Request, env: Env): Promise<Response> {
   await requireModerator(request, env);
   const { data } = await supabaseRequest<unknown[]>(
     env,
-    "/rest/v1/listing_reports?status=in.(open,reviewing)&select=id,listing_id,reason,details,reporter_email,reporter_country_code,status,created_at&order=created_at.asc&limit=100",
+    "/rest/v1/listing_reports?status=in.(open,reviewing)&select=id,listing_id,reason,details,reporter_country_code,status,created_at&order=created_at.asc&limit=100",
   );
   return json({ count: data.length, reports: data });
 }
@@ -378,6 +405,10 @@ const listingStateCacheRequest = (id: string) =>
 
 export async function isListingRemoved(env: Env, id: string): Promise<boolean> {
   const validId = listingId(id);
+  if (env.TOMBSTONE_STORE) {
+    const tombstone = await env.TOMBSTONE_STORE.get(validId);
+    if (tombstone !== null) return true;
+  }
   const cacheKey = listingStateCacheRequest(validId);
   const cached = await caches.default.match(cacheKey);
   if (cached) return (await cached.text()) === "removed";

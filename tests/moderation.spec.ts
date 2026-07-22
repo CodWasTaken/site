@@ -108,7 +108,7 @@ test("moderator login exchanges the Supabase session for a secure Worker session
   page,
 }) => {
   await page.route(
-    "https://kglyikactodqfxoimgyw.supabase.co/auth/v1/token?grant_type=password",
+    "**/auth/v1/token?grant_type=password",
     (route) =>
       route.fulfill({
         status: 200,
