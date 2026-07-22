@@ -145,18 +145,34 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
         ...document.querySelectorAll<HTMLElement>("[data-listing-id]"),
       ];
       if (listingNodes.length) {
-        void fetch("/api/listings/state")
-          .then(async (response) => {
-            if (!response.ok) return;
-            const payload = (await response.json()) as {
+        const listingIds = [
+          ...new Set(
+            listingNodes
+              .map((node) => node.dataset.listingId)
+              .filter((id): id is string => Boolean(id)),
+          ),
+        ];
+        const batches = Array.from(
+          { length: Math.ceil(listingIds.length / 100) },
+          (_, index) => listingIds.slice(index * 100, index * 100 + 100),
+        );
+        void Promise.all(batches.map(async (batch) => {
+          const query = new URLSearchParams();
+          batch.forEach((id) => query.append("id", id));
+          const response = await fetch(`/api/listings/state?${query}`);
+          if (!response.ok) return [];
+          const payload = (await response.json()) as {
               listings?: Array<{
                 listing_id: string;
                 featured: boolean;
                 removed: boolean;
               }>;
             };
+          return payload.listings ?? [];
+        }))
+          .then(async (responses) => {
             const states = new Map(
-              (payload.listings ?? []).map((item) => [item.listing_id, item]),
+              responses.flat().map((item) => [item.listing_id, item]),
             );
             listingNodes.forEach((node) => {
               const id = node.dataset.listingId;

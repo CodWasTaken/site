@@ -200,8 +200,15 @@ export function validateReport(value: unknown): ReportInput {
       400,
       "validation_failed",
     );
+  const listingId = requiredText(data.listing_id, "Listing", 3, 80);
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(listingId))
+    throw new RequestError(
+      "Listing ID is invalid.",
+      400,
+      "validation_failed",
+    );
   return {
-    listing_id: requiredText(data.listing_id, "Listing", 1, 160),
+    listing_id: listingId,
     reason,
     details: optionalText(data.details, 1_500),
     reporter_email: normalizeEmail(data.reporter_email),

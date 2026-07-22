@@ -59,6 +59,37 @@ test("public catalogue API paginates static records and exposes metadata", async
   assert.ok(body.pagination.nextCursor);
 });
 
+test("public listing state is ID-scoped, deduplicated, and cacheable", async () => {
+  const originalFetch = globalThis.fetch;
+  let query = "";
+  globalThis.fetch = async (input) => {
+    query = String(input);
+    return Response.json([
+      { listing_id: "one", featured: true, removed: false },
+    ]);
+  };
+  try {
+    const first = await worker.fetch(
+      new Request("https://fork.example/api/listings/state?id=one&id=one&id=two"),
+      baseEnv,
+    );
+    assert.equal(first.status, 200);
+    assert.match(query, /listing_id=in\.\(one,two\)/);
+    assert.match(first.headers.get("cache-control") ?? "", /s-maxage=60/);
+    const etag = first.headers.get("etag");
+    assert.ok(etag);
+    const second = await worker.fetch(
+      new Request("https://fork.example/api/listings/state?id=one&id=two", {
+        headers: { "if-none-match": etag },
+      }),
+      baseEnv,
+    );
+    assert.equal(second.status, 304);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("publication and removal cron reconciliation settle independently", async () => {
   const originalFetch = globalThis.fetch;
   const originalError = console.error;

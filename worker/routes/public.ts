@@ -15,6 +15,28 @@ import {
 
 const genericSuccess = () => json({ message: "Submitted for review." }, 201);
 
+const publicListingExists = async (env: Env, listingId: string): Promise<boolean> => {
+  if (env.TOMBSTONE_STORE && await env.TOMBSTONE_STORE.get(listingId) !== null)
+    return true;
+  const manifestUrl = new URL("/listing-manifest.json", "https://perkcommons.invalid");
+  const response = await env.ASSETS.fetch(new Request(manifestUrl));
+  if (!response.ok)
+    throw new RequestError(
+      "Listing validation is temporarily unavailable.",
+      503,
+      "listing_manifest_unavailable",
+    );
+  const payload = await response.json<unknown>();
+  if (!payload || typeof payload !== "object" || !("listingIds" in payload))
+    throw new RequestError(
+      "Listing validation is temporarily unavailable.",
+      503,
+      "listing_manifest_unavailable",
+    );
+  const listingIds = (payload as { listingIds: unknown }).listingIds;
+  return Array.isArray(listingIds) && listingIds.includes(listingId);
+};
+
 async function verifyTurnstile(
   env: Env,
   token: string | null,
@@ -214,6 +236,12 @@ export async function handlePublicReport(
     throw new RequestError("Report protection is misconfigured.", 503, "configuration_error");
   const input = validateReport(await readJson(request, 12_000));
   if (input.website) return genericSuccess();
+  if (!(await publicListingExists(env, input.listing_id)))
+    throw new RequestError(
+      "This listing does not exist in the public catalogue.",
+      404,
+      "listing_not_found",
+    );
   const signals = await requestSignals(request, env, input.reporter_email);
   if (await isRateLimited(env, signals.ipHash, "report"))
     return apiError(
@@ -230,6 +258,20 @@ export async function handlePublicReport(
     ))
   )
     return apiError("Spam verification failed.", 400, "spam_check_failed");
+  if (signals.ipHash) {
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1_000).toISOString();
+    const duplicateQuery =
+      `/rest/v1/listing_reports?listing_id=eq.${encodeURIComponent(input.listing_id)}` +
+      `&reason=eq.${encodeURIComponent(input.reason)}` +
+      `&reporter_ip_hash=eq.${encodeURIComponent(signals.ipHash)}` +
+      `&status=in.(open,reviewing)&created_at=gte.${encodeURIComponent(since)}` +
+      "&select=id&limit=1";
+    const { data: duplicates } = await supabaseRequest<Array<{ id: string }>>(
+      env,
+      duplicateQuery,
+    );
+    if (duplicates.length > 0) return genericSuccess();
+  }
   await insertRows(env, "listing_reports", {
     listing_id: input.listing_id,
     reason: input.reason,

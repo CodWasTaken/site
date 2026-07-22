@@ -346,7 +346,7 @@ test("featured listing stars are public and moderators can toggle them", async (
   page,
 }) => {
   const listingId = "github-student-developer-pack";
-  await page.route("**/api/listings/state", (route) =>
+  await page.route("**/api/listings/state**", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -382,7 +382,7 @@ test("featured listing stars are public and moderators can toggle them", async (
 
 test("upheld reports suppress removed listing details", async ({ page }) => {
   const listingId = "github-student-developer-pack";
-  await page.route("**/api/listings/state", (route) =>
+  await page.route("**/api/listings/state**", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",

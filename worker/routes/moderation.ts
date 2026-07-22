@@ -474,7 +474,7 @@ export async function resolveReport(
 }
 
 const listingId = (value: string): string => {
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value))
+  if (value.length > 80 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value))
     throw new RequestError("Listing ID is invalid.", 400, "validation_failed");
   return value;
 };
@@ -520,14 +520,38 @@ export async function isListingRemoved(env: Env, id: string): Promise<boolean> {
   }
 }
 
-export async function publicListingState(env: Env): Promise<Response> {
+export async function publicListingState(
+  request: Request,
+  env: Env,
+): Promise<Response> {
+  const requested = new URL(request.url).searchParams.getAll("id");
+  const ids = [...new Set(requested.map(listingId))];
+  if (ids.length === 0)
+    throw new RequestError("At least one listing ID is required.", 400, "validation_failed");
+  if (ids.length > 100)
+    throw new RequestError("At most 100 listing IDs may be requested.", 400, "validation_failed");
   const { data } = await supabaseRequest<
     Array<{ listing_id: string; featured: boolean; removed: boolean }>
   >(
     env,
-    "/rest/v1/listing_moderation_state?or=(featured.eq.true,removed.eq.true)&select=listing_id,featured,removed",
+    `/rest/v1/listing_moderation_state?listing_id=in.(${ids.join(",")})&or=(featured.eq.true,removed.eq.true)&select=listing_id,featured,removed`,
   );
-  return json({ listings: data });
+  const body = JSON.stringify({ listings: data });
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body));
+  const etag = `"${Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("")}"`;
+  if (request.headers.get("if-none-match") === etag)
+    return new Response(null, {
+      status: 304,
+      headers: { etag, "cache-control": "public, max-age=30, s-maxage=60, stale-while-revalidate=300" },
+    });
+  return new Response(body, {
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "public, max-age=30, s-maxage=60, stale-while-revalidate=300",
+      etag,
+      "x-content-type-options": "nosniff",
+    },
+  });
 }
 
 export async function featureListing(

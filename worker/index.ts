@@ -87,7 +87,7 @@ async function api(request: Request, env: Env): Promise<Response> {
         : methodNotAllowed();
     if (path === "/api/listings/state")
       return request.method === "GET"
-        ? await publicListingState(env)
+        ? await publicListingState(request, env)
         : methodNotAllowed();
     if (path === "/api/auth/session")
       return request.method === "POST"

@@ -42,6 +42,22 @@ const request = () =>
     body: JSON.stringify(submission),
   });
 
+const reportRequest = (listingId: string) =>
+  new Request("https://perkcommons.com/api/reports", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "CF-Connecting-IP": "192.0.2.2",
+    },
+    body: JSON.stringify({
+      listing_id: listingId,
+      reason: "Broken link",
+      details: "The application link no longer opens.",
+      website: "",
+      turnstile_token: null,
+    }),
+  });
+
 test("public submissions populate the required legacy website URL", async () => {
   const originalFetch = globalThis.fetch;
   let call = 0;
@@ -134,5 +150,47 @@ test("public submissions reject invalid Turnstile tokens before insertion", asyn
   } finally {
     globalThis.fetch = originalFetch;
     console.warn = originalWarn;
+  }
+});
+
+test("reports reject IDs absent from the static manifest", async () => {
+  const reportEnv = {
+    ...env,
+    ASSETS: {
+      fetch: async () => Response.json({ listingIds: ["known-listing"] }),
+    },
+  } satisfies Env;
+  const response = await worker.fetch(reportRequest("missing-listing"), reportEnv);
+  assert.equal(response.status, 404);
+  assert.deepEqual(await response.json(), {
+    error: {
+      code: "listing_not_found",
+      message: "This listing does not exist in the public catalogue.",
+    },
+  });
+});
+
+test("duplicate open reports return success without another insert", async () => {
+  const originalFetch = globalThis.fetch;
+  let call = 0;
+  const reportEnv = {
+    ...env,
+    ASSETS: {
+      fetch: async () => Response.json({ listingIds: ["known-listing"] }),
+    },
+  } satisfies Env;
+  globalThis.fetch = async () => {
+    call += 1;
+    return call === 1
+      ? Response.json([])
+      : Response.json([{ id: "existing-report" }]);
+  };
+  try {
+    const response = await worker.fetch(reportRequest("known-listing"), reportEnv);
+    assert.equal(response.status, 201);
+    assert.equal(call, 2);
+    assert.deepEqual(await response.json(), { message: "Submitted for review." });
+  } finally {
+    globalThis.fetch = originalFetch;
   }
 });
