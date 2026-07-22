@@ -66,10 +66,10 @@ async function isRateLimited(
   kind: "submission" | "report",
 ): Promise<boolean> {
   if (!ipHash) return false;
-  if (
-    env.SUBMISSION_RATE_LIMITER &&
-    !(await env.SUBMISSION_RATE_LIMITER.limit({ key: ipHash })).success
-  )
+  const limiter = kind === "submission"
+    ? env.SUBMISSION_RATE_LIMITER
+    : env.REPORT_RATE_LIMITER;
+  if (limiter && !(await limiter.limit({ key: ipHash })).success)
     return true;
   const since = new Date(Date.now() - 60 * 60 * 1_000).toISOString();
   const query =
@@ -130,6 +130,8 @@ export async function handlePublicSubmission(
   request: Request,
   env: Env,
 ): Promise<Response> {
+  if (env.ENVIRONMENT === "production" && Boolean(env.TURNSTILE_SECRET_KEY) !== Boolean(env.TURNSTILE_SITE_KEY))
+    throw new RequestError("Submission protection is misconfigured.", 503, "configuration_error");
   const input = validateSubmission(await readJson(request));
   if (input.website) return genericSuccess();
   const signals = await requestSignals(request, env, input.submitter_email);
@@ -208,6 +210,8 @@ export async function handlePublicReport(
   request: Request,
   env: Env,
 ): Promise<Response> {
+  if (env.ENVIRONMENT === "production" && Boolean(env.TURNSTILE_SECRET_KEY) !== Boolean(env.TURNSTILE_SITE_KEY))
+    throw new RequestError("Report protection is misconfigured.", 503, "configuration_error");
   const input = validateReport(await readJson(request, 12_000));
   if (input.website) return genericSuccess();
   const signals = await requestSignals(request, env, input.reporter_email);

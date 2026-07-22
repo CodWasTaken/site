@@ -104,6 +104,17 @@ export const prepareListingRemovalForReport = async (
   );
   const batch = data[0] ?? null;
   if (!batch || batch.status !== "preparing") return batch;
+  if (env.TOMBSTONE_STORE) {
+    await env.TOMBSTONE_STORE.put(
+      batch.listing_id,
+      JSON.stringify({
+        listingId: batch.listing_id,
+        removalBatchId: batch.id,
+        suppressedAt: new Date().toISOString(),
+        state: "suppressed-pending-git-removal",
+      }),
+    );
+  }
   return prepareBatch(env, batch);
 };
 

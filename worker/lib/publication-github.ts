@@ -1,8 +1,10 @@
 import { RequestError } from "./http";
 import type { PublishedOpportunity } from "./publication-data";
 
-const DATA_REPOSITORY = "PerkCommons/data";
-const SITE_REPOSITORY = "PerkCommons/site";
+// Fork-only safety boundary. Transferring this integration requires an explicit,
+// separately reviewed owner authorization after Build Week.
+const DATA_REPOSITORY = "CodWasTaken/data";
+const SITE_REPOSITORY = "CodWasTaken/site";
 const DATA_BRANCH = "main";
 const GITHUB_API_VERSION = "2026-03-10";
 

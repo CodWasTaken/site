@@ -1,5 +1,5 @@
 import { requireModerator } from "./lib/auth";
-import { methodNotAllowed } from "./lib/http";
+import { apiError, json, methodNotAllowed, withSecurityHeaders } from "./lib/http";
 import type { Env } from "./lib/types";
 import { reconcilePublicationBatches } from "./lib/publication";
 import { reconcileListingRemovals } from "./lib/removal";
@@ -15,6 +15,7 @@ import {
   moderationError,
   moderators,
   queue,
+  queueSummary,
   publicListingState,
   publications,
   purgeRejected,
@@ -38,10 +39,44 @@ const reportPattern = /^\/api\/moderation\/reports\/([0-9a-f-]+)\/resolve$/i;
 const featurePattern = /^\/api\/moderation\/listings\/([a-z0-9-]+)\/feature$/;
 const publicListingPattern = /^\/opportunities\/([a-z0-9-]+)\/?$/;
 
+async function publicCatalogApi(request: Request, env: Env): Promise<Response | null> {
+  const url = new URL(request.url);
+  const assets: Record<string, string> = {
+    "/api/v1/opportunities": "/data/opportunities.json",
+    "/api/v1/providers": "/provider-index.json",
+    "/api/v1/categories": "/facet-counts.json",
+  };
+  const assetPath = assets[url.pathname];
+  if (!assetPath) return null;
+  if (request.method !== "GET") return methodNotAllowed();
+  const assetUrl = new URL(assetPath, request.url);
+  const response = await env.ASSETS.fetch(new Request(assetUrl, { method: "GET" }));
+  if (!response.ok) return apiError("Catalogue asset unavailable.", 503, "catalogue_unavailable");
+  const payload = await response.json<Record<string, unknown>>();
+  if (url.pathname !== "/api/v1/opportunities") return json(payload);
+  const all = Array.isArray(payload.records) ? payload.records : [];
+  const limit = Math.min(100, Math.max(1, Number.parseInt(url.searchParams.get("limit") ?? "50", 10) || 50));
+  let offset = 0;
+  const cursor = url.searchParams.get("cursor");
+  if (cursor) {
+    try { offset = Math.max(0, Number.parseInt(atob(cursor), 10) || 0); }
+    catch { return apiError("Cursor is invalid.", 400, "invalid_cursor"); }
+  }
+  const records = all.slice(offset, offset + limit);
+  const nextOffset = offset + records.length;
+  return json({
+    metadata: payload.metadata,
+    pagination: { limit, returned: records.length, total: all.length, nextCursor: nextOffset < all.length ? btoa(String(nextOffset)) : null },
+    records,
+  });
+}
+
 async function api(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname;
   try {
+    const catalogResponse = await publicCatalogApi(request, env);
+    if (catalogResponse) return catalogResponse;
     if (path === "/api/submissions")
       return request.method === "POST"
         ? await handlePublicSubmission(request, env)
@@ -69,6 +104,10 @@ async function api(request: Request, env: Env): Promise<Response> {
     if (path === "/api/moderation/queue")
       return request.method === "GET"
         ? await queue(request, env)
+        : methodNotAllowed();
+    if (path === "/api/moderation/queue/summary")
+      return request.method === "GET"
+        ? await queueSummary(request, env)
         : methodNotAllowed();
     if (path === "/api/moderation/reports")
       return request.method === "GET"
@@ -146,14 +185,14 @@ async function api(request: Request, env: Env): Promise<Response> {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname.startsWith("/api/")) return api(request, env);
+    if (url.pathname.startsWith("/api/")) return withSecurityHeaders(await api(request, env));
     const publicListing = url.pathname.match(publicListingPattern);
     if (
       request.method === "GET" &&
       publicListing?.[1] &&
       (await isListingRemoved(env, publicListing[1]))
     )
-      return new Response(
+      return withSecurityHeaders(new Response(
         '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta name="robots" content="noindex"><title>Listing removed - PerkCommons</title></head><body><main><h1>Listing removed</h1><p>This opportunity was removed after moderator review.</p><p><a href="/opportunities/">Browse other opportunities</a></p></main></body></html>',
         {
           status: 410,
@@ -163,25 +202,33 @@ export default {
             "x-content-type-options": "nosniff",
           },
         },
-      );
+      ));
     if (url.pathname === "/moderate" || url.pathname.startsWith("/moderate/")) {
       try {
         await requireModerator(request, env);
       } catch {
         const login = new URL("/moderator-login/", request.url);
         login.searchParams.set("next", "/moderate/");
-        return Response.redirect(login.toString(), 302);
+        return withSecurityHeaders(Response.redirect(login.toString(), 302));
       }
     }
-    return env.ASSETS.fetch(request);
+    return withSecurityHeaders(await env.ASSETS.fetch(request));
   },
   async scheduled(
     _controller: ScheduledController,
     env: Env,
     context: ExecutionContext,
   ): Promise<void> {
-    context.waitUntil(
-      reconcilePublicationBatches(env).then(() => reconcileListingRemovals(env)),
-    );
+    context.waitUntil(Promise.allSettled([
+      reconcilePublicationBatches(env),
+      reconcileListingRemovals(env),
+    ]).then((results) => {
+      results.forEach((result, index) => {
+        if (result.status === "rejected") console.error(JSON.stringify({
+          event: index === 0 ? "publication_cron_failed" : "removal_cron_failed",
+          error: result.reason instanceof Error ? result.reason.name : "unknown",
+        }));
+      });
+    }));
   },
 } satisfies ExportedHandler<Env>;

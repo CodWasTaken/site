@@ -8,6 +8,11 @@ export type SubmissionStatus =
   | "published"
   | "withdrawn";
 
+interface TombstoneStore {
+  get(key: string): Promise<string | null>;
+  put(key: string, value: string): Promise<void>;
+}
+
 export interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
   SUPABASE_URL: string;
@@ -17,7 +22,19 @@ export interface Env {
   GITHUB_DATA_PUBLICATION_TOKEN?: string;
   GITHUB_SITE_DEPLOY_TOKEN?: string;
   TURNSTILE_SECRET_KEY?: string;
+  TURNSTILE_SITE_KEY?: string;
+  ENVIRONMENT?: "development" | "test" | "production";
+  TOMBSTONE_STORE?: TombstoneStore;
   SUBMISSION_RATE_LIMITER?: {
+    limit(options: { key: string }): Promise<{ success: boolean }>;
+  };
+  REPORT_RATE_LIMITER?: {
+    limit(options: { key: string }): Promise<{ success: boolean }>;
+  };
+  LOGIN_RATE_LIMITER?: {
+    limit(options: { key: string }): Promise<{ success: boolean }>;
+  };
+  TRACKING_RATE_LIMITER?: {
     limit(options: { key: string }): Promise<{ success: boolean }>;
   };
 }
