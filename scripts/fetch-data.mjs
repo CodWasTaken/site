@@ -1,11 +1,33 @@
-import { rm } from "node:fs/promises";
+import { access, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const destination = resolve(repositoryRoot, ".data");
-const dataRepository = "https://github.com/PerkCommons/data.git";
+const explicitPath = process.env.PERKCOMMONS_DATA_REPOSITORY_PATH?.trim();
+const siblingPath = resolve(repositoryRoot, "../data");
+for (const localPath of [explicitPath, siblingPath].filter(Boolean)) {
+  try {
+    await access(resolve(localPath, "opportunities"));
+    console.log(`Using isolated local data checkout at ${localPath}.`);
+    process.exit(0);
+  } catch {
+    if (explicitPath === localPath) {
+      throw new Error(`PERKCOMMONS_DATA_REPOSITORY_PATH does not contain opportunities/: ${localPath}`);
+    }
+  }
+}
+
+const dataRepository = process.env.PERKCOMMONS_DATA_REPOSITORY?.trim();
+if (!dataRepository) {
+  throw new Error(
+    "No isolated data checkout found. Set PERKCOMMONS_DATA_REPOSITORY to a verified fork URL; official repositories are not accepted.",
+  );
+}
+if (/github\.com[/:]PerkCommons\//i.test(dataRepository)) {
+  throw new Error("Refusing to clone an official PerkCommons repository in fork-only mode.");
+}
 const dataRef = process.env.PERKCOMMONS_DATA_REF?.trim();
 
 await rm(destination, { recursive: true, force: true });

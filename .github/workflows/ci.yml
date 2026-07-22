@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
-          repository: PerkCommons/data
+          repository: CodWasTaken/data
           path: .data
       - uses: actions/setup-node@v4
         with:
