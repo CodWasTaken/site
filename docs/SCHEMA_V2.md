@@ -18,6 +18,11 @@ Review provenance never requires a public moderator identity. `reviewerReference
 
 The canonical schema identifier is `https://perkcommons.com/schema/opportunity-v2.json`; the unresolved `.org` identifier from v1 is not reused.
 
+The v1 schema is now canonical at `https://perkcommons.com/schema/opportunity.json`.
+`/schema/opportunity-v1-legacy.json` publishes a compatibility alias carrying the
+old `.org` identifier and referring consumers to the `.com` schema. Existing
+records remain v1-compatible; the alias does not rewrite their history.
+
 ## Validation beyond shape
 
 Runtime checks add ISO country membership, opening/closing order, open listings with passed deadlines, filename/ID agreement, unsupported versions, normalized v2 provider/title duplicates and canonical URL duplicates unless explicitly related. Report-only checks identify generic text, probable bundles and duplicated evidence for human review.

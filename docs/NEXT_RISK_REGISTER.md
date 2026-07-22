@@ -23,5 +23,6 @@
 | R19 | Branding diverges across repositories | Medium / medium | Canonical fork SVG assets used | Token generation/package strategy and visual regression tests |
 | R20 | Browser/accessibility gaps outside Chromium | Medium / high | Keyboard semantics, reduced motion and Chromium desktop/mobile tests | Firefox/WebKit, Axe, forced colors, zoom and screen-reader manual validation |
 | R21 | Wrangler development dependency inherits a vulnerable `sharp` build | Medium / medium | Runtime application does not import `sharp`; advisory is confined to build/local tooling and dry-run succeeded | Upgrade when Wrangler/Miniflare ships a fixed dependency; do not accept npm's suggested old Wrangler downgrade without compatibility review |
+| R22 | Previously approved rows lack v2 editorial semantics | High / high | Publication readiness check rejects incomplete rows; additive migration does not backfill facts | Re-review old approvals in a disposable fork database before any v2 publication |
 
 Risks are reviewed per phase. A deferred control cannot be treated as implemented merely because it appears in this register.

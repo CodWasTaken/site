@@ -13,6 +13,9 @@ Prepared 2026-07-22. This handoff covers local branches in personal forks owned 
 - Replaced the 1,068-card directory DOM with a static-first 24-card first page, lazy weighted search, URL-persistent filters, sorting, and incremental loading.
 - Generated static JSON/JSONL/CSV exports, search/facet/provider/category/audience assets, schema, OpenAPI, tombstone/change-feed placeholders, compatibility metadata, and a paginated public API facade.
 - Improved branded cards, status presentation, detail-page URL semantics, convenience actions, and submission autosave/duplicate warning behavior.
+- Corrected the canonical v1 schema domain with a compatibility alias and taught the site to consume both v1 and v2 records without flattening v2 status, URLs, deadlines, geography or provenance.
+- Reworked approval/publication so moderators make explicit v2 editorial choices and publication refuses incomplete legacy approvals rather than forcing `active`, `Global`, `community` or non-sponsored defaults.
+- Scoped and cached public listing-state reads, validated report targets against a static manifest/tombstones, and suppressed duplicate open reports without exposing whether a report already exists.
 - Added centralized report-only CSP and security headers, separate intake rate-limit bindings, edge-first tombstone suppression, fail-closed configured tombstone access, and independent publication/removal cron settlement.
 - Added a minimized moderation queue-summary endpoint and an unapplied SQL migration contract for assignment, revision, conflict-of-interest, and distinct second-review enforcement.
 - Replaced deploy automation with a credential-free fork dry run pinned to an exact data SHA. Automation targets only `CodWasTaken/*`.
@@ -51,10 +54,10 @@ No branch or commit was pushed during this project.
 | data | `npm audit` | 0 known vulnerabilities after transitive lock update |
 | site | `npm ci` | completed; no credentials used |
 | site | `npm run check` | Astro and TypeScript checks passed |
-| site | `npm test` | 36 passed, 0 failed |
+| site | `npm test` | 41 passed, 0 failed |
 | site | `npm run build` | 1,095 static routes built; 1,068 detail pages indexed |
 | site | `npm run test:browser` | final full Chromium desktop/mobile run: 50 passed, 4 intentionally skipped, 0 failed |
-| site | `npx wrangler deploy --dry-run --outdir /tmp/perkcommons-next-wrangler-dry-run` | bundled 3,356 assets and exited without authentication or deployment |
+| site | `wrangler deploy --dry-run --outdir <isolated-temp-directory>` | Wrangler 4.113.0 bundled 3,358 assets and exited without authentication or deployment |
 | branding | `jq empty` plus SVG presence checks | passed |
 | docs | exact offline Lychee workflow | not run: Lychee is not installed locally |
 
@@ -80,7 +83,7 @@ Open `http://127.0.0.1:4322/`. The build resolves the adjacent isolated `data` f
 - Provider pages, original audience guides, comparison UI, separate sitemaps, structured deadlines, and benefit-aware sorting are deferred.
 - Submission tracking references, correction/withdrawal flows, and multiple structured evidence inputs remain deferred.
 - The minimized queue summary exists, but the current moderation UI still needs modular state, saved views, dedicated private detail/reveal auditing, selectable publication batches, operational metrics, and richer report decisions.
-- The SQL review-concurrency migration is an isolated proposal only. It has not been applied to any Supabase project.
+- The SQL review-concurrency and publication-semantics migrations are isolated proposals only. Neither has been applied to any Supabase project. Existing approved rows require human re-review before v2 publication.
 - Edge tombstones require an isolated KV namespace before hosted testing. No namespace was created and no production binding was contacted.
 - GitHub App authentication, exact hosted deployment state, production-equivalent smoke verification, and publication/removal dashboards remain proposals.
 - Firefox, WebKit/Safari, Axe, screen-reader, forced-colors, high-contrast, 200%/400% zoom, and manual device verification remain outstanding.
@@ -97,8 +100,8 @@ Open `http://127.0.0.1:4322/`. The build resolves the adjacent isolated `data` f
 
 ## Database and deployment requirements
 
-1. Review `supabase/migrations/202607220001_next_review_concurrency.sql` with privacy/security owners.
-2. Apply it only to a disposable fork Supabase project, test rollback and RLS, then run concurrency/second-review integration tests.
+1. Review `supabase/migrations/202607220001_next_review_concurrency.sql` and `202607220002_publication_semantics.sql` with privacy/security and editorial owners.
+2. Apply them in order only to a disposable fork Supabase project, test rollback and RLS, then run concurrency, second-review and v2 publication integration tests. Re-review pre-migration approved rows; do not backfill editorial facts.
 3. Provision an isolated tombstone KV store and isolated Turnstile/rate-limit configuration; never reuse production identifiers or secrets.
 4. Pin the exact site commit, data commit, schema version, taxonomy version, and minimum migration in the compatibility manifest.
 5. Run the credential-free dry-run workflow first, then deploy only to a distinct non-production hostname after explicit authorization.

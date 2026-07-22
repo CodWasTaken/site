@@ -1,6 +1,6 @@
 # Moderation workspace version 2
 
-The current workspace remains functional but is not yet the target implementation. Approval means creating a normalized public proposal; publication is a separate administrator decision.
+The current workspace remains functional but is not yet the complete target implementation. Approval means creating a normalized public proposal; publication is a separate administrator decision. The approval editor now requires explicit v2 choices for resource type, availability, deadline type, URL purposes, geography, sponsorship and claims checked. It does not silently assign active/global/community/non-sponsored defaults.
 
 ## Target modules and state
 
@@ -26,10 +26,12 @@ Decisions include dismiss, correct, expire, dispute, temporarily suppress, perma
 
 Administrators select records, preview files, validate, split moderate batches, exclude/retry individual records and see PR/deployment state. The archive shows provider, title, reason, reviewers, date, batch, PR, listing route, deployment and undo eligibility.
 
+The isolated migration `202607220002_publication_semantics.sql` adds the normalized v2 publication fields and updates the moderation/publication RPC contracts. It has not been applied anywhere. Existing approved rows remain incomplete by design and must return to human review before publication; the Worker rejects such rows with `publication_requires_review` instead of inventing facts.
+
 ## Operations
 
 Dashboard metrics include queue age, median review time, decisions/reasons, flag/undo/report-uphold rates, review-due records, failed publication/removal, deploy delay, retention run and migration status. Aggregate reports must avoid exposing private identities or small-group personal data.
 
 ## Current gaps
 
-Queue pagination is capped rather than cursor-based, total counts are incomplete, summaries include private data, and second-review/revision enforcement is absent. These are documented deferred items, not implemented claims.
+The minimized queue-summary endpoint supports cursor paging, but the browser workspace still lacks page controls, saved views and a dedicated detail/reveal API. The proposed revision and second-review database contracts are isolated migrations and have not been exercised against a Supabase instance. Selectable batches, field-level diff/preview, assignments, richer report decisions and operational analytics remain deferred.

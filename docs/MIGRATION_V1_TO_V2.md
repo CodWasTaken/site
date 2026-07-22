@@ -26,6 +26,7 @@ Never point `--output` at `opportunities/`.
 - Benefit and topic suggestions are derived but the record remains `needs-human-review`.
 - Existing sponsor boolean is preserved; no new sponsorship value is invented.
 - Missing creation time, reviewer, evidence claims, application URL, deadline and structured geography stay null/empty and appear in `unresolvedFields`.
+- Date-only deadlines stay date-only. Migration and publication do not invent a UTC cutoff or provider timezone.
 
 ## Review/adoption procedure
 
@@ -38,5 +39,7 @@ Never point `--output` at `opportunities/`.
 7. Publish small v2 batches alongside v1 fixtures.
 8. Run site/data compatibility tests and compare preserved URLs, availability, geography and canonical routes.
 9. Retire v1 writing only after every active consumer supports v2; preserve v1 Git history indefinitely.
+
+Newly reviewed moderation records can publish directly as v2 after the isolated `202607220002_publication_semantics.sql` migration is reviewed and applied to a disposable fork database. Pre-migration approved records do not have the required editorial choices; return them to review instead of bulk-filling defaults. The Worker enforces this boundary before preparing Git files.
 
 The 2026-07-22 dry run validated 1,068/1,068 records and retained 10,737 unresolved-field markers. That is migration evidence, not human factual verification.

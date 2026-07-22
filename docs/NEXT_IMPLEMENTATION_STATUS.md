@@ -15,6 +15,8 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` implemented, `[t]` tested, `
 
 - [t] Canonical v2 model generates JSON Schema, TypeScript, form options, OpenAPI components and draft SQL constraints.
 - [t] V1-to-v2 migration preserves identity, URLs, legacy availability/geography and explicit unresolved fields.
+- [t] Canonical v1 schema identity uses `perkcommons.com`; a legacy `.org` alias remains available for compatibility.
+- [t] V2 availability accepts date-only or date-time review values without inventing a timezone.
 - [t] Full dry run: 1,068/1,068 records schema-valid; no v1 records replaced.
 - [t] Unknown country and impossible date-order runtime checks.
 - [t] Importers write isolated candidate envelopes and contain no hard-coded review date or published-directory path.
@@ -33,6 +35,7 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` implemented, `[t]` tested, `
 - [x] Distinct status styles and canonical brand mark/wordmark copied from the branding fork.
 - [x] Moderator access moved out of primary/mobile navigation; theme control moved into header.
 - [x] Listing detail quick facts plus local bookmark, compare-list, copy-link and record-export actions.
+- [t] V2 detail pages keep provider, program, application and evidence URL purposes distinct and expose deadline calendar export plus public-safe provenance.
 - [d] Provider pages, comparison workflow and high-value editorial audience guides.
 - [d] Structured deadlines, closing-soon and highest-benefit sorts require reviewed v2 data.
 
@@ -41,6 +44,8 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` implemented, `[t]` tested, `
 - [t] Central CSP report-only, Referrer-Policy, Permissions-Policy, nosniff, HSTS and COOP headers.
 - [t] One-sided production Turnstile configuration fails closed.
 - [t] Separate submission/report rate-limit binding selection; login/tracking bindings reserved.
+- [t] Public reports require a valid published/tombstoned listing ID and duplicate open reports are suppressed without leaking report state.
+- [t] Listing-state requests are ID-scoped, deduplicated, ETagged and edge-cacheable.
 - [t] Edge tombstones take precedence over cache/Supabase and return 410.
 - [t] Removal preparation writes a tombstone before Git preparation when the binding exists.
 - [t] Publication and removal cron reconciliation use `Promise.allSettled`.
@@ -58,16 +63,18 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` implemented, `[t]` tested, `
 - [d] Dedicated detail endpoint and deliberate audited email reveal.
 - [d] Modular state model, cursor pagination, saved views and operational dashboard.
 - [t] Isolated migration contract adds optimistic revision and distinct second-review enforcement; migration was not applied.
+- [t] Approval now requires explicit resource type, availability, deadline semantics, URL purposes, geography, sponsorship and checked claims; publication emits schema v2 without editorial defaults.
+- [t] Isolated publication-semantics migration persists the new fields and deliberately blocks older approved rows until human re-review; migration was not applied.
 - [d] Selectable publication batches and field-level preview.
 
 ## Validation evidence
 
 - [t] Data: `npm test` — 10/10 passed after changes.
 - [t] Clean installs: `npm ci` completed in data and site without using credentials.
-- [t] Site: `npm test` — 36/36 passed after changes.
+- [t] Site: `npm test` — 41/41 passed after changes.
 - [t] Site: `npm run build` — 1,095 static routes built; Pagefind indexed 1,068 detail pages.
 - [t] Browser: final full Chromium desktop/mobile suite — 50 passed, 4 intentionally skipped, 0 failed.
-- [t] Wrangler 4.113.0 dry run bundled 3,356 static assets and exited without authentication or deployment.
+- [t] Wrangler 4.113.0 dry run bundled 3,358 static assets and exited without authentication or deployment.
 - [t] Branding JSON/SVG workflow checks passed locally.
 - [b] Docs' exact offline Lychee check was not executable locally because the Lychee binary is not installed.
 - [t] Data dependency audit reports zero known vulnerabilities after updating the transitive `fast-uri` lock.
