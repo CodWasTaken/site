@@ -36,7 +36,12 @@ const destinationLabel = listing.applicationUrl ? "Open application" : "Open pro
   title={`${listing.title} — PerkCommons`}
   description={listing.description}
 >
-  <article class="container py-12" data-pagefind-body data-listing-id={listing.id} data-listing-detail>
+  <article
+    class="container py-12"
+    data-pagefind-body={listing.defaultSearchEligible !== false ? "" : undefined}
+    data-listing-id={listing.id}
+    data-listing-detail
+  >
     <a
       href="/opportunities/"
       class="inline-flex items-center gap-2 text-sm text-muted"

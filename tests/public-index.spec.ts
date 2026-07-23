@@ -77,6 +77,20 @@ test("directory filters records and preserves a stable layout", async ({
   await expect(page).toHaveURL(/\/opportunities\/$/);
 });
 
+test("default search excludes ordinary products but permits an explicit resource opt-in", async ({
+  page,
+}) => {
+  await page.goto("/opportunities/");
+  await page.getByRole("searchbox", { name: "Search" }).fill('"Basic Plan"');
+  await expect(page.locator("#count")).toHaveText("0 records");
+  await expect(page.getByText("Zoom Basic", { exact: true })).toHaveCount(0);
+
+  await page.getByLabel("Resource type").selectOption("general-free-product");
+  await expect(
+    page.locator('a[href="/opportunities/zoom-basic-plan/"]'),
+  ).toBeVisible();
+});
+
 test("category pages expose counts, stable routes, and indexed taxonomy metadata", async ({
   page,
 }) => {

@@ -2,14 +2,18 @@
 import { ArrowLeft } from "lucide-astro";
 import ListingCard from "../../components/ListingCard.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import { getListings, type Listing } from "../../lib/listings";
+import {
+  getListings,
+  isDefaultOpportunity,
+  type Listing,
+} from "../../lib/listings";
 import {
   categoryDefinition,
   type CategoryDefinition,
 } from "../../lib/taxonomy";
 
 export async function getStaticPaths() {
-  const listings = await getListings();
+  const listings = (await getListings()).filter(isDefaultOpportunity);
   const populated = [...new Set(listings.map((listing) => listing.category))];
   return populated.map((categoryId) => ({
     params: { category: categoryId },

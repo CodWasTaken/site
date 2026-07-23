@@ -3,7 +3,12 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
 import { getDataRepositoryRoot } from "./data-path";
-import { getListings, type Listing } from "./listings";
+import {
+  getListings,
+  isDefaultOpportunity,
+  type Listing,
+  type ListingStatus,
+} from "./listings";
 import { categories } from "./taxonomy";
 
 const execFileAsync = promisify(execFile);
@@ -26,7 +31,7 @@ export interface CatalogIndexRecord {
   subcategories: string[];
   tags: string[];
   regions: string[];
-  status: string;
+  status: ListingStatus;
   reviewDate: string;
   sponsored: boolean;
   resourceType: CatalogResourceType;
@@ -118,7 +123,4 @@ export async function getDatasetMetadata(): Promise<DatasetMetadata> {
 }
 
 export const publicCatalogRecords = (records: CatalogIndexRecord[]) =>
-  records.filter((record) =>
-    record.defaultSearchEligible !== false &&
-    !["expired", "disputed", "archived"].includes(record.status)
-  );
+  records.filter(isDefaultOpportunity);

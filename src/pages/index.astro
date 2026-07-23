@@ -2,10 +2,10 @@
 import { ArrowRight, Database, ShieldCheck, Users } from "lucide-astro";
 import ListingCard from "../components/ListingCard.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
-import { getListings } from "../lib/listings";
+import { getListings, isDefaultOpportunity } from "../lib/listings";
 import { categoryDefinitions } from "../lib/taxonomy";
 const listings = await getListings();
-const active = listings.filter((item) => !["expired", "disputed"].includes(item.status));
+const active = listings.filter(isDefaultOpportunity);
 const categoryCounts = new Map<string, number>();
 for (const listing of active) categoryCounts.set(listing.category, (categoryCounts.get(listing.category) ?? 0) + 1);
 const populatedCategories = categoryDefinitions.filter((category) => categoryCounts.has(category.id));
@@ -14,13 +14,13 @@ const populatedCategories = categoryDefinitions.filter((category) => categoryCou
   <section class="border-b border-line bg-surface py-16 sm:py-20">
     <div class="container grid items-end gap-10 lg:grid-cols-[1.35fr_.65fr]">
       <div>
-        <p class="mb-5 text-sm font-semibold text-brand">Open data. Human reviewed.</p>
+        <p class="mb-5 text-sm font-semibold text-brand">Open data. Evidence-led review.</p>
         <h1 class="max-w-4xl text-4xl font-semibold leading-tight tracking-normal text-ink sm:text-6xl">Opportunities should be easy to find.</h1>
-        <p class="mt-6 max-w-2xl text-lg leading-8 text-muted">Explore credible credits, grants, programs, discounts, and benefits. No subscription, no paywall, and no pay-to-verify listings.</p>
+        <p class="mt-6 max-w-2xl text-lg leading-8 text-muted">Explore selective, time-limited, or materially valuable credits, grants, programs, and benefits. Ordinary free products and generic memberships are kept outside default results.</p>
         <div class="mt-8 flex flex-wrap gap-3"><a href="/opportunities/" class="inline-flex items-center gap-2 rounded-md bg-action px-5 py-3 font-medium text-white no-underline">Browse the index <ArrowRight size={18} /></a><a href="/submit/" class="rounded-md border border-line bg-surface px-5 py-3 font-medium text-ink no-underline">Contribute a listing</a></div>
       </div>
       <dl class="grid grid-cols-2 gap-px overflow-hidden rounded-md border border-line bg-line">
-        <div class="bg-canvas p-5"><dt class="text-xs uppercase text-muted">Published</dt><dd class="mt-2 text-3xl font-semibold">{active.length}</dd></div>
+        <div class="bg-canvas p-5"><dt class="text-xs uppercase text-muted">Default opportunities</dt><dd class="mt-2 text-3xl font-semibold">{active.length}</dd></div>
         <div class="bg-canvas p-5"><dt class="text-xs uppercase text-muted">Categories</dt><dd class="mt-2 text-3xl font-semibold">{new Set(active.map((item) => item.category)).size}</dd></div>
       </dl>
     </div>
@@ -43,7 +43,7 @@ const populatedCategories = categoryDefinitions.filter((category) => categoryCou
 
   <section class="container py-16">
     <div class="grid gap-10 md:grid-cols-3">
-      <div><ShieldCheck class="text-brand" size={24} /><h2 class="mt-4 font-semibold">Evidence over promises</h2><p class="mt-2 text-sm leading-6 text-muted">Every record shows its status, source, eligibility, and review date. Providers still control final terms.</p></div>
+      <div><ShieldCheck class="text-brand" size={24} /><h2 class="mt-4 font-semibold">Evidence over promises</h2><p class="mt-2 text-sm leading-6 text-muted">Records show their source and review state. A date alone is not presented as proof of verification, and providers still control final terms.</p></div>
       <div><Database class="text-brand" size={24} /><h2 class="mt-4 font-semibold">Open by default</h2><p class="mt-2 text-sm leading-6 text-muted">The factual dataset lives in Git under CC0. Download it, audit it, or build another public service with it.</p></div>
       <div><Users class="text-brand" size={24} /><h2 class="mt-4 font-semibold">Community maintained</h2><p class="mt-2 text-sm leading-6 text-muted">Individuals and companies contribute under one published standard. Sponsorship cannot purchase verification.</p></div>
     </div>

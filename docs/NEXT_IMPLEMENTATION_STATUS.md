@@ -17,10 +17,12 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` implemented, `[t]` tested, `
 - [t] V1-to-v2 migration preserves identity, URLs, legacy availability/geography and explicit unresolved fields.
 - [t] Canonical v1 schema identity uses `perkcommons.com`; a legacy `.org` alias remains available for compatibility.
 - [t] V2 availability accepts date-only or date-time review values without inventing a timezone.
-- [t] Full dry run: 1,068/1,068 records schema-valid; no v1 records replaced.
+- [t] Mixed-schema dry run: 1,068/1,068 records schema-valid; 779 v1 records migrated in memory and 289 existing v2 records validated without replacement.
 - [t] Unknown country and impossible date-order runtime checks.
 - [t] Importers write isolated candidate envelopes and contain no hard-coded review date or published-directory path.
-- [t] Scope, quality, duplicate and stale reports generated deterministically for 2026-07-22.
+- [t] Scope, quality, duplicate and stale reports generated deterministically for 2026-07-23.
+- [t] 289 explicit high-confidence non-opportunity decisions preserve records and history while excluding them from default discovery; 779 remain default-eligible.
+- [t] Scope automation is pinned to a versioned decision manifest with expected match counts; heuristic candidates cannot change publication or discovery state.
 - [x] Coverage reports are descriptive rather than quota failures.
 - [d] Network broken-link/redirect audit was not run; the report marks both metrics unmeasured.
 - [d] Optional semantic duplicate detection.
@@ -28,6 +30,7 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` implemented, `[t]` tested, `
 ## Public site and discovery
 
 - [t] Directory initial HTML limited to 24 cards; search index lazy-loaded on interaction.
+- [t] Homepage, category pages, default directory results and Pagefind consistently exclude records with `defaultSearchEligible: false`; explicit resource-type selection permits opt-in access.
 - [t] Weighted title/provider/alias/benefit/category/tag/eligibility/description search, phrase gating, synonyms and typo tolerance.
 - [t] Category, resource type, status, region and archived filters; URL persistence; incremental load.
 - [t] JSON, JSONL, CSV, schema, OpenAPI, provider, facet, category and audience assets generated with commit/version metadata.
@@ -74,11 +77,11 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` implemented, `[t]` tested, `
 
 ## Validation evidence
 
-- [t] Data: `npm test` — 10/10 passed after changes.
+- [t] Data: `npm test` — 13/13 passed after changes.
 - [t] Clean installs: `npm ci` completed in data and site without using credentials.
-- [t] Site: `npm test` — 47/47 passed after changes.
-- [t] Site: `npm run build` — 1,095 static routes built; Pagefind indexed 1,068 detail pages.
-- [t] Browser: final full Chromium desktop/mobile suite — 50 passed, 4 intentionally skipped, 0 failed.
+- [t] Site: `npm test` — 49/49 passed after changes.
+- [t] Site: `npm run build` — 1,095 static routes built; Pagefind indexed 779 default-eligible detail pages.
+- [t] Browser: final full Chromium desktop/mobile suite — 52 passed, 4 intentionally skipped, 0 failed, including default-scope exclusion and explicit resource opt-in.
 - [t] Wrangler 4.113.0 `dev` dry run bundled 3,359 static assets and exited without authentication or deployment.
 - [t] Local Wrangler runtime: homepage/security headers, paginated catalogue API and sitemap returned 200; unknown API returned 404.
 - [t] Branding JSON/SVG workflow checks passed locally.

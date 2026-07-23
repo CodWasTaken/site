@@ -7,10 +7,11 @@ Prepared 2026-07-23. This handoff covers local branches in personal forks owned 
 - Established fork-only remotes, disabled every official upstream push URL, and recorded the safety boundary in every repository.
 - Audited the current public-data, submission, moderation, publication, removal, deployment, search, Supabase, Cloudflare, automation, and privacy boundaries.
 - Added one canonical opportunity-v2 model with generated JSON Schema, TypeScript, runtime validation, form options, OpenAPI components, and draft SQL constraints.
-- Added a non-destructive v1-to-v2 migration. Its full dry run validated all 1,068 records while preserving 10,737 ambiguous values as explicit unresolved markers.
-- Replaced catalogue quotas with descriptive coverage plus deterministic scope, quality, duplicate-candidate, stale-record, and migration reports. Heuristics do not delete, merge, archive, or publish records.
+- Added a non-destructive v1-to-v2 migration. Its mixed-schema dry run validated all 1,068 records: 779 v1 records migrated in memory and 289 existing v2 records validated without being migrated again, preserving 10,448 ambiguous values as explicit unresolved markers.
+- Replaced catalogue quotas with descriptive coverage plus deterministic scope, quality, duplicate-candidate, stale-record, and migration reports. A versioned, fixed-count decision manifest excludes 289 clear non-opportunities from default discovery while preserving every record and its Git history; heuristics do not delete, merge, archive, publish, or change discovery state.
 - Isolated all importers behind candidate envelopes; importers no longer write into the canonical published directory or hard-code review dates.
 - Replaced the 1,068-card directory DOM with a static-first 24-card first page, lazy weighted search, URL-persistent filters, sorting, and incremental loading.
+- Applied the scope decision consistently to homepage/category listings, default directory search, and Pagefind. The 779 default opportunities remain discoverable; typed resources can be reached only after an explicit resource-type opt-in.
 - Generated static JSON/JSONL/CSV exports, search/facet/provider/category/audience assets, schema, OpenAPI, tombstone/change-feed placeholders, compatibility metadata, and a paginated public API facade.
 - Improved branded cards, status presentation, detail-page URL semantics, convenience actions, and submission autosave/duplicate warning behavior.
 - Corrected the canonical v1 schema domain with a compatibility alias and taught the site to consume both v1 and v2 records without flattening v2 status, URLs, deadlines, geography or provenance.
@@ -50,17 +51,17 @@ No branch or commit was pushed during this project.
 | Repository | Command | Result |
 | --- | --- | --- |
 | data | `npm ci` | completed; no credentials used |
-| data | `npm run check` | generated artifacts current; 1,068 v1 records valid |
-| data | `npm test` | 10 passed, 0 failed |
-| data | `npm run reports` | all required scope/quality/duplicate/stale reports regenerated |
-| data | `npm run migrate:v2` | 1,068/1,068 v2 results valid; 10,737 unresolved markers; no records written |
+| data | `npm run check` | generated artifacts and 289 explicit scope decisions current; all 1,068 mixed-schema records valid |
+| data | `npm test` | 13 passed, 0 failed |
+| data | `npm run reports -- --as-of 2026-07-23` | all required scope/quality/duplicate/stale reports regenerated; 289 excluded and 779 default-eligible |
+| data | `npm run migrate:v2` | 1,068/1,068 results valid; 779 v1 migrated in memory, 289 v2 validated, 10,448 unresolved markers; no records written |
 | data | `npm audit` | 0 known vulnerabilities after transitive lock update |
 | site | `npm ci` | completed; no credentials used |
 | site | `npm run check` | Astro and TypeScript checks passed |
-| site | `npm test` | 47 passed, 0 failed |
+| site | `npm test` | 49 passed, 0 failed |
 | site | greenfield SQL on disposable PostgreSQL 17 | schema and end-to-end RPC smoke test passed; real pg_cron was represented by matching local signatures |
-| site | `npm run build` | 1,095 static routes built; 1,068 detail pages indexed |
-| site | `npm run test:browser` | final full Chromium desktop/mobile run: 50 passed, 4 intentionally skipped, 0 failed |
+| site | `npm run build` | 1,095 static routes built; 779 default-eligible detail pages indexed |
+| site | `npm run test:browser` | final full Chromium desktop/mobile run: 52 passed, 4 intentionally skipped, 0 failed |
 | site | `npm run worker:dry-run` | Wrangler 4.113.0 bundled 3,359 assets for the named `dev` environment and exited without authentication or deployment |
 | site | local `wrangler dev --env dev --local` smoke | homepage and six security headers, catalogue API and sitemap returned 200; unknown API returned 404 |
 | site | hosted `perkcommons-next-fork-dev` smoke | homepage, listing, catalogue API, sitemap and Supabase-backed listing state returned 200; unknown API returned 404; six security headers present |

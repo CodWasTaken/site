@@ -1,10 +1,10 @@
 ---
 import { ArrowRight } from "lucide-astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import { getListings } from "../../lib/listings";
+import { getListings, isDefaultOpportunity } from "../../lib/listings";
 import { categoryDefinitions } from "../../lib/taxonomy";
 
-const listings = await getListings();
+const listings = (await getListings()).filter(isDefaultOpportunity);
 const counts = new Map<string, number>();
 for (const listing of listings) {
   counts.set(listing.category, (counts.get(listing.category) ?? 0) + 1);

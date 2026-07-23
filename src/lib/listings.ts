@@ -157,6 +157,13 @@ export async function getListings(): Promise<Listing[]> {
   return cache.sort((a, b) => b.reviewDate.localeCompare(a.reviewDate) || a.title.localeCompare(b.title));
 }
 
+export function isDefaultOpportunity(
+  listing: Pick<Listing, "defaultSearchEligible" | "status">,
+): boolean {
+  return listing.defaultSearchEligible !== false &&
+    !["expired", "disputed", "archived"].includes(listing.status);
+}
+
 export function formatDate(value: string): string {
   return new Intl.DateTimeFormat("en", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${value}T00:00:00Z`));
 }
