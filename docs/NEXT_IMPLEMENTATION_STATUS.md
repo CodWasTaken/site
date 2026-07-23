@@ -23,7 +23,8 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` implemented, `[t]` tested, `
 - [t] Scope, quality, duplicate and stale reports generated deterministically for 2026-07-23.
 - [t] 289 explicit high-confidence non-opportunity decisions preserve records and history while excluding them from default discovery; 779 remain default-eligible.
 - [t] Scope automation is pinned to a versioned decision manifest with expected match counts; heuristic candidates cannot change publication or discovery state.
-- [t] Removed the importer-generated `limited` default from 1,011 records and all 18 importers. Unreviewed availability is now `unconfirmed`; `limited` requires current human-reviewed evidence.
+- [t] Removed the importer-generated `limited` default from 1,011 records and all 18 importers. A complete 1,068-record availability ledger now assigns 304 current/open, 10 rolling, 27 closed, 3 upcoming, 2 limited, 1 temporarily unavailable, 1 waitlist and 720 unconfirmed outcomes.
+- [t] Availability research fetched 1,050 distinct HTTPS sources, retained hashes/short evidence excerpts, applied 17 context corrections, and labels all 332 v2 research records `automated-source-research` plus `needs-human-review`; it never claims manual approval.
 - [x] Coverage reports are descriptive rather than quota failures.
 - [d] Network broken-link/redirect audit was not run; the report marks both metrics unmeasured.
 - [d] Optional semantic duplicate detection.
@@ -78,7 +79,7 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` implemented, `[t]` tested, `
 
 ## Validation evidence
 
-- [t] Data: `npm test` — 15/15 passed after changes.
+- [t] Data: `npm test` — 19/19 passed after changes.
 - [t] Clean installs: `npm ci` completed in data and site without using credentials.
 - [t] Site: `npm test` — 49/49 passed after changes.
 - [t] Site: `npm run build` — 1,095 static routes built; Pagefind indexed 779 default-eligible detail pages.

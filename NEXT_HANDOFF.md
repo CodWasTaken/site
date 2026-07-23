@@ -13,6 +13,7 @@ Prepared 2026-07-23. This handoff covers local branches in personal forks owned 
 - Replaced the 1,068-card directory DOM with a static-first 24-card first page, lazy weighted search, URL-persistent filters, sorting, and incremental loading.
 - Applied the scope decision consistently to homepage/category listings, default directory search, and Pagefind. The 779 default opportunities remain discoverable; typed resources can be reached only after an explicit resource-type opt-in.
 - Corrected 1,011 importer-generated `limited` availability values to `unconfirmed` without claiming that sources are currently open. All 18 importers now emit unreviewed candidates as `unconfirmed`, and regression checks prevent that blanket default from returning.
+- Checked all 1,068 records against 1,050 distinct provider URLs and applied a conservative availability ledger: 304 current/open, 10 rolling, 27 closed, 3 upcoming, 2 limited, 1 temporarily unavailable, 1 waitlist and 720 unconfirmed. Seventeen date/context corrections are versioned separately; automated checks remain `needs-human-review` and never claim manual approval.
 - Generated static JSON/JSONL/CSV exports, search/facet/provider/category/audience assets, schema, OpenAPI, tombstone/change-feed placeholders, compatibility metadata, and a paginated public API facade.
 - Improved branded cards, status presentation, detail-page URL semantics, convenience actions, and submission autosave/duplicate warning behavior.
 - Corrected the canonical v1 schema domain with a compatibility alias and taught the site to consume both v1 and v2 records without flattening v2 status, URLs, deadlines, geography or provenance.
@@ -39,21 +40,22 @@ The site's nested `.data` clone is also on `next/schema-v2`, with the personal d
 
 ## Commits
 
-Changes are committed locally using narrowly scoped conventional subjects. Run the following in each fork for immutable commit IDs:
+Changes are committed using narrowly scoped conventional subjects. The availability audit is data commit `db80383`; run the following in each fork for the complete immutable history:
 
 ```bash
 git log --oneline origin/main..HEAD
 ```
 
-No branch or commit was pushed during this project.
+Only the personal fork branches were pushed. No official branch, pull request or repository was targeted.
 
 ## Validation executed
 
 | Repository | Command | Result |
 | --- | --- | --- |
 | data | `npm ci` | completed; no credentials used |
-| data | `npm run check` | generated artifacts and 289 explicit scope decisions current; all 1,068 mixed-schema records valid |
-| data | `npm test` | 15 passed, 0 failed |
+| data | `npm run check` | generated artifacts, 289 scope decisions and all 1,068 availability decisions current; all mixed-schema records valid |
+| data | `npm test` | 19 passed, 0 failed |
+| data | `npm run research:availability` | 1,068 records checked against 1,050 distinct HTTPS sources; full JSON and human-readable reports generated |
 | data | `npm run reports -- --as-of 2026-07-23` | all required scope/quality/duplicate/stale reports regenerated; 289 excluded and 779 default-eligible |
 | data | `npm run migrate:v2` | 1,068/1,068 results valid; 779 v1 migrated in memory, 289 v2 validated, 10,448 unresolved markers; no records written |
 | data | `npm audit` | 0 known vulnerabilities after transitive lock update |
@@ -84,15 +86,16 @@ npm run preview -- --host 127.0.0.1 --port 4322
 Open `http://127.0.0.1:4322/`. The build resolves the adjacent isolated `data` fork. Browser-test screenshots and traces are generated under ignored `test-results/`; no screenshots contain production credentials.
 
 The isolated hosted test Worker is available at
-`https://perkcommons-next-fork-dev.cod3eater.workers.dev`. The verified
-deployment version is `f0031a88-4109-457f-aab8-7b1b8b0f41ef`. It has no
+`https://perkcommons-next-fork-dev.cod3eater.workers.dev`. Immutable deployment
+versions can be inspected with `wrangler versions list --env dev`; the handoff
+does not label one mutable deployment as production. The Worker has no
 custom-domain route, cron, GitHub automation credentials, Turnstile secret or
 tombstone KV binding and must not be represented as the official site.
 
 ## Known limitations and deferred work
 
-- Current v1 facts are not editorially upgraded by migration. Ambiguous status, geography, provenance, evidence, application URL, and deadline values require human review.
-- Broken links and redirects are explicitly reported as `not-measured`; no large network crawl was performed.
+- Availability outcomes are AI-assisted research, not approval. All 332 v2 records touched by research remain `needs-human-review`; 720 ambiguous, blocked, conflicting or unsupported records remain `unconfirmed`.
+- The availability crawl recorded HTTP results, redirect destinations and 61 records with blocked sources, but it is not a full semantic broken-link or redirect-quality audit.
 - The search index is lazy but remains approximately 1 MB uncompressed. Shard-first loading and representative ranking fixtures remain work.
 - Provider pages, original audience guides, comparison UI, separate sitemaps, structured deadlines, and benefit-aware sorting are deferred.
 - Submission tracking references, correction/withdrawal flows, and multiple structured evidence inputs remain deferred.
