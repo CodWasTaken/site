@@ -63,6 +63,7 @@ No branch or commit was pushed during this project.
 | site | `npm run test:browser` | final full Chromium desktop/mobile run: 50 passed, 4 intentionally skipped, 0 failed |
 | site | `npm run worker:dry-run` | Wrangler 4.113.0 bundled 3,359 assets for the named `dev` environment and exited without authentication or deployment |
 | site | local `wrangler dev --env dev --local` smoke | homepage and six security headers, catalogue API and sitemap returned 200; unknown API returned 404 |
+| site | hosted `perkcommons-next-fork-dev` smoke | homepage, listing, catalogue API, sitemap and Supabase-backed listing state returned 200; unknown API returned 404; six security headers present |
 | branding | `jq empty` plus SVG presence checks | passed |
 | docs | exact offline Lychee workflow | not run: Lychee is not installed locally |
 
@@ -80,6 +81,12 @@ npm run preview -- --host 127.0.0.1 --port 4322
 
 Open `http://127.0.0.1:4322/`. The build resolves the adjacent isolated `data` fork. Browser-test screenshots and traces are generated under ignored `test-results/`; no screenshots contain production credentials.
 
+The isolated hosted test Worker is available at
+`https://perkcommons-next-fork-dev.cod3eater.workers.dev`. The verified
+deployment version is `f0031a88-4109-457f-aab8-7b1b8b0f41ef`. It has no
+custom-domain route, cron, GitHub automation credentials, Turnstile secret or
+tombstone KV binding and must not be represented as the official site.
+
 ## Known limitations and deferred work
 
 - Current v1 facts are not editorially upgraded by migration. Ambiguous status, geography, provenance, evidence, application URL, and deadline values require human review.
@@ -91,6 +98,7 @@ Open `http://127.0.0.1:4322/`. The build resolves the adjacent isolated `data` f
 - The SQL review-concurrency and publication-semantics migrations are isolated proposals only. Neither has been applied to any Supabase project. Existing approved rows require human re-review before v2 publication.
 - The greenfield baseline was not applied to a hosted Supabase project. It requires Supabase-managed Auth/API roles and the pg_cron extension; validate it once more with `supabase db reset` in the future isolated fork project.
 - Edge tombstones require an isolated KV namespace before hosted testing. No namespace was created and no production binding was contacted.
+- Hosted test submissions are not yet Turnstile-protected; do not promote or broadly advertise the test Worker before the fork-only widget is configured.
 - GitHub App authentication, exact hosted deployment state, production-equivalent smoke verification, and publication/removal dashboards remain proposals.
 - Firefox, WebKit/Safari, Axe, screen-reader, forced-colors, high-contrast, 200%/400% zoom, and manual device verification remain outstanding.
 - CSP is report-only by design; enforcement requires a fork report-collection period and inline-script remediation.
@@ -98,6 +106,7 @@ Open `http://127.0.0.1:4322/`. The build resolves the adjacent isolated `data` f
 ## Security and privacy considerations
 
 - Do not add production credentials to `.env.production`, Wrangler configuration, CI, fixtures, screenshots, or documentation.
+- Keep test Worker secrets only in ignored `.dev.vars.dev` and the named Cloudflare `dev` environment. The current tracked `.env.production` working-tree change must remain uncommitted or be moved to an ignored local override before any push.
 - A hosted fork must use isolated Supabase, Cloudflare, Turnstile, GitHub App, KV, and rate-limit resources.
 - Require `TOMBSTONE_STORE` for any production-like environment and define reason-sensitive failure policy before launch.
 - Preserve HttpOnly, Secure, SameSite, role, same-origin, service-role, and raw-IP protections.

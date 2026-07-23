@@ -53,6 +53,7 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` implemented, `[t]` tested, `
 - [t] Fork workflow accepts exact data SHA and performs credential-free build plus Wrangler dry run only.
 - [t] Named `dev` Worker uses a distinct `workers.dev` target, test-only rate-limit namespaces, no route, no cron and no GitHub automation secrets.
 - [t] Static-asset `_headers` policy matches Worker responses; local runtime probe confirmed all six headers on the homepage.
+- [t] Isolated Worker deployed to `perkcommons-next-fork-dev.cod3eater.workers.dev`; hosted homepage, listing, catalogue API, sitemap, Supabase state and 404 smoke checks passed.
 - [d] Reason-sensitive tombstone policy, KV reconciliation, static tombstone feed and production smoke verification.
 - [d] Worker-signed session replacing the reusable Supabase access token cookie.
 - [d] GitHub App installation-token integration.
@@ -86,4 +87,4 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` implemented, `[t]` tested, `
 - [~] Site dependency audit reports three high-severity development-tool findings through Wrangler/Miniflare `sharp`; npm offers only an unsafe Wrangler downgrade, so this remains registered.
 - [ ] Manual Firefox/WebKit, forced-colors, screen-reader and 400% zoom review.
 
-No production database, Worker, workflow, secret or domain was changed or contacted for mutation.
+No production database, Worker, workflow, secret or domain was changed or contacted for mutation. The only hosted mutation was creation of the explicitly isolated `perkcommons-next-fork-dev` Worker and its four test-only Supabase runtime secrets.
