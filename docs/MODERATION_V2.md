@@ -18,6 +18,28 @@ Every mutable item has revision, assigned moderator, claimed/review-start times 
 
 Show submitted and normalized public versions side by side, exact changed fields, copy/reset controls, evidence checklist, duplicate candidates, validation errors, generated JSON and shared public-card/page preview. Status, URL purpose, deadline, geography, resource type, default-search eligibility, sponsorship and public provenance require explicit editorial choices. No implicit `active`, `Global`, `community` or `sponsor=false` values.
 
+## Existing-listing review
+
+The workspace now has a dedicated **Unconfirmed listings** queue backed by the
+build-generated public catalogue rather than private submission rows. It
+supports exact totals, category and text filtering, stable oldest-review-first
+ordering, and incremental loading. Queue summaries contain only public listing
+fields.
+
+**Review and edit** loads the canonical public record into the same explicit v2
+editor used for approvals. Saving does not mutate Git or publish a factual
+claim. It calls the transactional `create_listing_update` RPC, which stores an
+audited pending `listing_update` submission and normalized draft against the
+existing stable listing ID. A unique partial index prevents overlapping active
+updates for one listing. The normal human approval and administrator
+publication steps remain mandatory; publication overwrites the stable file
+path and preserves its original creation timestamp.
+
+Apply `202607240001_listing_update_workflow.sql` to an existing isolated fork
+database before using the edit action. New empty fork projects should instead
+use the regenerated greenfield baseline. Neither file is authorized for the
+official or production database.
+
 ## Reports and removals
 
 Decisions include dismiss, correct, expire, dispute, temporarily suppress, permanently remove, merge duplicate, escalate and require second reviewer. Store affected field, evidence, related group, research notes, correction, appeal and conflict state. Sensitive scam/malware/privacy/security removals write a fail-closed edge tombstone first.
@@ -34,4 +56,12 @@ Dashboard metrics include queue age, median review time, decisions/reasons, flag
 
 ## Current gaps
 
-The minimized queue-summary endpoint supports cursor paging, but the browser workspace still lacks page controls, saved views and a dedicated detail/reveal API. The proposed revision and second-review database contracts are isolated migrations and have not been exercised against a Supabase instance. Selectable batches, field-level diff/preview, assignments, richer report decisions and operational analytics remain deferred.
+The minimized private-submission queue-summary endpoint supports cursor paging,
+while the unconfirmed public-listing queue has working incremental controls and
+lives in its own `src/scripts/moderation/unconfirmed.ts` module. The remaining
+submission/report/archive views still lack page controls, saved views and a
+dedicated private reveal API. The proposed revision, second-review and
+listing-update database contracts remain isolated migrations and have not been
+exercised against a hosted Supabase instance. Selectable batches, field-level
+diff/preview, assignments, richer report decisions and operational analytics
+remain deferred.

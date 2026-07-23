@@ -259,6 +259,136 @@ test("pending card renders evidence, country tooltip, links, and copy controls",
   });
 });
 
+test("unconfirmed queue lets moderators propose an audited update", async ({
+  page,
+}) => {
+  await mockModeration(page);
+  const listing = {
+    id: "existing-grant",
+    provider: "Example Foundation",
+    title: "Existing Grant",
+    category: "funding",
+    subcategories: ["research-funding"],
+    tags: ["open-source"],
+    description: "Existing public description that needs verification.",
+    eligibility: "Open-source maintainers may apply.",
+    value: "$1,000 in project funding.",
+    sourceUrl: "https://example.org/grant",
+    officialUrl: "https://example.org/grant/apply",
+    status: "unconfirmed",
+    reviewDate: "2025-01-01",
+    resourceType: "funding",
+    defaultSearchEligible: true,
+    providerUrl: "https://example.org",
+    programUrl: "https://example.org/grant",
+    applicationUrl: "https://example.org/grant/apply",
+    deadline: null,
+    deadlineType: "none",
+    global: true,
+    remote: true,
+    countries: [],
+    regions: ["Global", "Remote"],
+    reviewedAt: "2025-01-01T12:00:00Z",
+    nextReviewAt: null,
+    claimsChecked: ["program-exists"],
+    sponsor: false,
+  };
+  await page.route(
+    "**/api/moderation/listings/unconfirmed?*",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          queue: "unconfirmed",
+          total: 1,
+          count: 1,
+          nextCursor: null,
+          listings: [
+            {
+              id: listing.id,
+              provider: listing.provider,
+              title: listing.title,
+              description: listing.description,
+              benefit: listing.value,
+              category: listing.category,
+              categoryLabel: "Funding",
+              status: "unconfirmed",
+              reviewDate: listing.reviewDate,
+              resourceType: listing.resourceType,
+              defaultSearchEligible: true,
+              canonicalUrl: `/opportunities/${listing.id}/`,
+              destinationUrl: listing.applicationUrl,
+            },
+          ],
+        }),
+      }),
+  );
+  await page.route(
+    `**/api/moderation/listings/${listing.id}`,
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ listing }),
+      }),
+  );
+  const updatePayloads: Array<{ normalized: Record<string, unknown> }> = [];
+  await page.route(
+    `**/api/moderation/listings/${listing.id}/updates`,
+    async (route) => {
+      updatePayloads.push(
+        route.request().postDataJSON() as {
+          normalized: Record<string, unknown>;
+        },
+      );
+      return route.fulfill({
+        status: 202,
+        contentType: "application/json",
+        body: JSON.stringify({
+          message: "Listing update queued for human review.",
+          submission_id: "33333333-3333-4333-8333-333333333333",
+          target_listing_id: listing.id,
+        }),
+      });
+    },
+  );
+
+  await page.goto("/moderate/");
+  await page
+    .getByRole("button", { name: "Unconfirmed listings" })
+    .click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Canonical listings needing verification",
+    }),
+  ).toBeVisible();
+  await expect(page.getByText("Existing Grant")).toBeVisible();
+  await page.getByRole("button", { name: "Review and edit" }).click();
+  const dialog = page.getByRole("dialog", {
+    name: "Review and update Existing Grant",
+  });
+  await expect(
+    dialog.getByLabel("Availability", { exact: true }),
+  ).toHaveValue("unconfirmed");
+  await dialog
+    .getByLabel("Availability", { exact: true })
+    .selectOption("open");
+  await dialog.getByLabel("Status reason").fill(
+    "Applications are open on the official provider page.",
+  );
+  await dialog
+    .getByRole("button", { name: "Queue update for review" })
+    .click();
+  await expect.poll(() => updatePayloads.length).toBe(1);
+  expect(
+    updatePayloads[0]!.normalized.availability_status,
+  ).toBe("open");
+  await expect(
+    page.getByRole("heading", { name: "Open Infrastructure Grant" }),
+  ).toBeVisible();
+});
+
 test("unknown country uses a neutral accessible fallback", async ({ page }) => {
   await mockModeration(page, {
     submission: { ...baseSubmission, submission_country_code: null },

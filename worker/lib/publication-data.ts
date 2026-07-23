@@ -12,6 +12,8 @@ export type PublicationDeadlineType = "fixed" | "rolling" | "periodic" | "unknow
 
 export interface PublicationPayload {
   submission_id: string;
+  target_listing_id?: string | null;
+  original_created_at?: string | null;
   title: string;
   organization: string;
   primary_category: string;
@@ -156,6 +158,11 @@ const slugPart = (value: string): string =>
     .replace(/^-+|-+$/g, "");
 
 export const publicationListingId = (payload: PublicationPayload): string => {
+  if (
+    payload.target_listing_id &&
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(payload.target_listing_id)
+  )
+    return payload.target_listing_id;
   const suffix = payload.submission_id.replaceAll("-", "").slice(0, 8);
   const base = slugPart(`${payload.organization}-${payload.title}`) || "opportunity";
   return `${base.slice(0, 71).replace(/-+$/g, "")}-${suffix}`;
@@ -163,6 +170,12 @@ export const publicationListingId = (payload: PublicationPayload): string => {
 
 export const publicationPayloadIssues = (payload: PublicationPayload): string[] => {
   const issues: string[] = [];
+  if (
+    payload.target_listing_id !== null &&
+    payload.target_listing_id !== undefined &&
+    !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(payload.target_listing_id)
+  )
+    issues.push("target_listing_id");
   if (!RESOURCE_TYPES.has(payload.resource_type)) issues.push("resource_type");
   if (typeof payload.default_search_eligible !== "boolean") issues.push("default_search_eligible");
   if (!STATUSES.has(payload.availability_status)) issues.push("availability_status");
@@ -197,6 +210,11 @@ export const toPublishedOpportunity = (
   payload: PublicationPayload,
 ): PublishedOpportunity => {
   const reviewedAt = new Date(payload.normalized_at).toISOString();
+  const createdAt =
+    payload.original_created_at &&
+    !Number.isNaN(new Date(payload.original_created_at).valueOf())
+      ? new Date(payload.original_created_at).toISOString()
+      : reviewedAt;
   const applicationUrl = payload.application_url || null;
   const evidenceUrls: EvidenceUrl[] = [
     {
@@ -292,7 +310,7 @@ export const toPublishedOpportunity = (
       extractorVersion: null,
     },
     changeHistory: {
-      createdAt: reviewedAt,
+      createdAt,
       updatedAt: reviewedAt,
       previousIds: [],
       supersedes: [],

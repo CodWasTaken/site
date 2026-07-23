@@ -77,6 +77,26 @@ test("publication data uses stable IDs and the public data schema", () => {
   assert.equal(published.sponsorship.sponsored, false);
 });
 
+test("listing updates preserve the canonical ID and original creation time", () => {
+  const updatePayload: PublicationPayload = {
+    ...payload,
+    target_listing_id: "existing-stable-listing",
+    original_created_at: "2024-02-03T04:05:06Z",
+    normalized_at: "2026-07-24T12:00:00Z",
+  };
+  assert.equal(publicationListingId(updatePayload), "existing-stable-listing");
+  const published = toPublishedOpportunity(updatePayload);
+  assert.equal(published.id, "existing-stable-listing");
+  assert.equal(
+    published.changeHistory.createdAt,
+    "2024-02-03T04:05:06.000Z",
+  );
+  assert.equal(
+    published.changeHistory.updatedAt,
+    "2026-07-24T12:00:00.000Z",
+  );
+});
+
 test("reviewers cannot start publication batches through the Worker API", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input) => {

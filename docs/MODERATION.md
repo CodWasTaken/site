@@ -72,6 +72,15 @@ upheld reports so listings suppressed before the migration are removed from
 the Git dataset without being reported again. Apply it before deploying the
 automated removal Worker.
 
+Migration `202607240001_listing_update_workflow.sql` adds audited update
+proposals for canonical Git listings. It records the target listing ID,
+prevents two active proposals for the same record, stores the moderator's
+normalized draft transactionally, and carries the stable target ID and
+original creation time through publication. Apply it only to the isolated fork
+database after the earlier migrations. For a new empty project, use the
+regenerated greenfield baseline instead of mixing baseline and incremental
+files.
+
 Approval and publication remain separate decisions. An administrator can use
 **Publish all approved** to claim every approved normalized submission in one
 batch. The Worker writes one branch and pull request in `PerkCommons/data`.
@@ -277,6 +286,9 @@ POST /api/moderation/submissions/:id/unflag
 POST /api/moderation/submissions/:id/undo
 POST /api/moderation/submissions/:id/notes
 GET  /api/moderation/reports
+GET  /api/moderation/listings/unconfirmed
+GET  /api/moderation/listings/:id
+POST /api/moderation/listings/:id/updates
 POST /api/moderation/reports/:id/resolve
 POST /api/moderation/listings/:id/feature
 DELETE /api/moderation/submissions/:id

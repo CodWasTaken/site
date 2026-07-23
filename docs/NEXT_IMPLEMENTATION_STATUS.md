@@ -68,12 +68,16 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` implemented, `[t]` tested, `
 - [x] Existing accessible preview and validation retained; public-field local autosave and duplicate warning added.
 - [d] Public tracking reference, correction/withdrawal status workflow.
 - [t] Cursor-based queue summary endpoint minimizes fields and excludes contributor descriptions and identity.
+- [t] Dedicated unconfirmed-listing queue reads public static data, supports search/category filters and incremental loading, and exposes no contributor data.
+- [t] Existing-listing editor creates an audited pending update against the stable canonical ID; publication preserves that ID and original creation timestamp.
+- [t] Unconfirmed queue UI is isolated in `src/scripts/moderation/unconfirmed.ts` instead of adding its state to the legacy monolith.
+- [b] Hosted listing edits require applying `202607240001_listing_update_workflow.sql` to the isolated dev Supabase project; it has not been applied from this workspace.
 - [d] Dedicated detail endpoint and deliberate audited email reveal.
 - [d] Modular state model, cursor pagination, saved views and operational dashboard.
 - [t] Isolated migration contract adds optimistic revision and distinct second-review enforcement; migration was not applied.
 - [t] Approval now requires explicit resource type, availability, deadline semantics, URL purposes, geography, sponsorship and checked claims; publication emits schema v2 without editorial defaults.
 - [t] Isolated publication-semantics migration persists the new fields and deliberately blocks older approved rows until human re-review; migration was not applied.
-- [t] Deterministic greenfield Supabase baseline creates the missing root submission table and squashes all nine fork migrations into one empty-project transaction.
+- [t] Deterministic greenfield Supabase baseline creates the missing root submission table and squashes all ten fork migrations into one empty-project transaction.
 - [t] Greenfield baseline validated on disposable PostgreSQL 17: 13 tables, RLS/private grants, v2 approval, publication batching, report/removal batching and retention scheduling.
 - [d] Selectable publication batches and field-level preview.
 
@@ -81,10 +85,10 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` implemented, `[t]` tested, `
 
 - [t] Data: `npm test` — 19/19 passed after changes.
 - [t] Clean installs: `npm ci` completed in data and site without using credentials.
-- [t] Site: `npm test` — 49/49 passed after changes.
+- [t] Site: `npm test` — 53/53 passed after changes.
 - [t] Site: `npm run build` — 1,095 static routes built; Pagefind indexed 779 default-eligible detail pages.
-- [t] Browser: final full Chromium desktop/mobile suite — 52 passed, 4 intentionally skipped, 0 failed, including default-scope exclusion and explicit resource opt-in.
-- [t] Wrangler 4.113.0 `dev` dry run bundled 3,359 static assets and exited without authentication or deployment.
+- [t] Browser: final full Chromium desktop/mobile suite — 54 passed, 4 intentionally skipped, 0 failed, including the unconfirmed queue/edit proposal workflow.
+- [t] Wrangler 4.113.0 `dev` dry run read 3,064 static assets and exited without authentication or deployment.
 - [t] Local Wrangler runtime: homepage/security headers, paginated catalogue API and sitemap returned 200; unknown API returned 404.
 - [t] Branding JSON/SVG workflow checks passed locally.
 - [b] Docs' exact offline Lychee check was not executable locally because the Lychee binary is not installed.

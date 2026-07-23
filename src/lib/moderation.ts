@@ -33,9 +33,14 @@ export interface ModerationSubmission {
   published_at: string | null;
   last_action_at?: string | null;
   decision_reason: string | null;
+  submission_kind?: "public_submission" | "listing_update";
+  target_listing_id?: string | null;
+  proposed_by_moderator?: string | null;
+  original_created_at?: string | null;
 }
 
 export interface ModerationContext {
+  normalized?: Record<string, unknown> | null;
   flags?: Array<{
     reason: string;
     notes?: string | null;

@@ -60,6 +60,7 @@ import { categoryDefinitions } from "../lib/taxonomy";
             [
               ["pending", "Pending"],
               ["flagged", "Flagged"],
+              ["unconfirmed", "Unconfirmed listings"],
               ["approved", "Approved"],
               ["rejected", "Rejected"],
               ["published", "Published"],
@@ -84,6 +85,17 @@ import { categoryDefinitions } from "../lib/taxonomy";
           <option value="">All categories</option>
           {categoryDefinitions.map((category) => <option value={category.id}>{category.label}</option>)}
         </select>
+      </label>
+
+      <label id="unconfirmed-search-label" class="mt-4 hidden max-w-xl">
+        <span class="text-xs font-semibold uppercase text-muted">Search unconfirmed listings</span>
+        <input
+          id="unconfirmed-search"
+          type="search"
+          maxlength="120"
+          placeholder="Title, provider, ID, benefit, or description"
+          class="mt-2 min-h-11 w-full rounded-md border border-line bg-surface px-3 text-sm"
+        />
       </label>
 
       <div class="mt-5 flex items-center justify-between gap-3 text-sm">
@@ -366,6 +378,29 @@ import { categoryDefinitions } from "../lib/taxonomy";
         </div>
       </section>
 
+      <section
+        id="unconfirmed-view"
+        class="mt-5 hidden"
+        aria-labelledby="unconfirmed-heading"
+      >
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 id="unconfirmed-heading" class="text-lg font-semibold">Canonical listings needing verification</h2>
+            <p class="mt-1 max-w-3xl text-sm leading-6 text-muted">
+              Editing creates an audited update proposal. It does not change the
+              public Git record until a moderator approves it and an
+              administrator publishes a validated fork batch.
+            </p>
+          </div>
+          <button
+            id="load-more-unconfirmed"
+            type="button"
+            class="hidden min-h-11 rounded-md border border-line bg-surface px-4 text-sm font-semibold"
+          >Load more</button>
+        </div>
+        <div id="unconfirmed-list" class="mt-4 grid gap-3"></div>
+      </section>
+
       <section id="archive-view" class="mt-5 hidden" aria-labelledby="archive-heading">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <h2 id="archive-heading" class="text-lg font-semibold">Reviewed submissions</h2>
@@ -440,7 +475,7 @@ import { categoryDefinitions } from "../lib/taxonomy";
           class="grid size-11 place-items-center"
           aria-label="Close"><X size={20} /></button>
       </div>
-      <p class="mt-2 text-sm leading-6 text-muted">
+      <p id="approve-description" class="mt-2 text-sm leading-6 text-muted">
         Approval creates a normalized public-ready record. An administrator
         must include it in a validated publication batch before it appears publicly.
       </p>
@@ -658,6 +693,7 @@ import { categoryDefinitions } from "../lib/taxonomy";
         >
       </div>
       <button
+        id="approve-submit"
         type="submit"
         class="mt-6 min-h-11 w-full rounded-md bg-green-700 px-4 font-semibold text-white"
         >Approve and save</button

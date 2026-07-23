@@ -142,3 +142,222 @@ test("queue summary pagination excludes private submission fields", async () => 
     assert.doesNotMatch(summaryQuery, /submitter_(email|name|notes)|description|eligibility/);
   } finally { globalThis.fetch = originalFetch; }
 });
+
+test("unconfirmed listing queue is authenticated, filtered, and paginated without private data", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    if (url.endsWith("/auth/v1/user"))
+      return Response.json({
+        id: "22222222-2222-4222-8222-222222222222",
+        email: "moderator@example.org",
+      });
+    if (url.includes("moderator_profiles"))
+      return Response.json([{ role: "reviewer" }]);
+    throw new Error(`Unexpected request: ${url}`);
+  };
+  const records = [
+    {
+      id: "old-grant",
+      provider: "Example Foundation",
+      title: "Old Grant",
+      description: "An unconfirmed grant.",
+      benefit: "$1,000",
+      category: "funding",
+      categoryLabel: "Funding",
+      status: "unconfirmed",
+      reviewDate: "2025-01-01",
+      resourceType: "funding",
+      defaultSearchEligible: true,
+      canonicalUrl: "/opportunities/old-grant/",
+      destinationUrl: "https://example.org/grant",
+    },
+    {
+      id: "current-grant",
+      provider: "Example Foundation",
+      title: "Current Grant",
+      description: "A confirmed grant.",
+      benefit: "$2,000",
+      category: "funding",
+      categoryLabel: "Funding",
+      status: "open",
+      reviewDate: "2026-01-01",
+      resourceType: "funding",
+      defaultSearchEligible: true,
+      canonicalUrl: "/opportunities/current-grant/",
+      destinationUrl: "https://example.org/current",
+    },
+    {
+      id: "old-resource",
+      provider: "Other Provider",
+      title: "Old Resource",
+      description: "An unconfirmed resource.",
+      benefit: "Free access",
+      category: "education-training",
+      categoryLabel: "Education and training",
+      status: "unconfirmed",
+      reviewDate: "2025-02-01",
+      resourceType: "learning-resource",
+      defaultSearchEligible: false,
+      canonicalUrl: "/opportunities/old-resource/",
+      destinationUrl: "https://other.example/resource",
+    },
+  ];
+  const env = {
+    ...baseEnv,
+    ASSETS: {
+      fetch: async (request: Request) => {
+        assert.equal(new URL(request.url).pathname, "/catalog-index.json");
+        return Response.json({ records });
+      },
+    },
+  } satisfies Env;
+  try {
+    const unauthorized = await worker.fetch(
+      new Request("https://fork.example/api/moderation/listings/unconfirmed"),
+      env,
+    );
+    assert.equal(unauthorized.status, 401);
+
+    const response = await worker.fetch(
+      new Request(
+        "https://fork.example/api/moderation/listings/unconfirmed?category=funding&search=foundation&limit=1",
+        { headers: { cookie: "pc_moderator_session=test-session" } },
+      ),
+      env,
+    );
+    assert.equal(response.status, 200);
+    const body = await response.json() as {
+      total: number;
+      count: number;
+      nextCursor: string | null;
+      listings: Array<Record<string, unknown>>;
+    };
+    assert.equal(body.total, 1);
+    assert.equal(body.count, 1);
+    assert.equal(body.nextCursor, null);
+    assert.equal(body.listings[0]?.id, "old-grant");
+    assert.equal("submitter_email" in body.listings[0]!, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("listing edits create an audited pending update instead of mutating the static asset", async () => {
+  const originalFetch = globalThis.fetch;
+  const rpcBodies: Record<string, unknown>[] = [];
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    if (url.endsWith("/auth/v1/user"))
+      return Response.json({
+        id: "22222222-2222-4222-8222-222222222222",
+        email: "moderator@example.org",
+      });
+    if (url.includes("moderator_profiles"))
+      return Response.json([{ role: "reviewer" }]);
+    if (
+      url.includes("opportunity_submissions?submission_kind=eq.listing_update")
+    )
+      return Response.json([]);
+    if (url.endsWith("/rpc/create_listing_update")) {
+      rpcBodies.push(
+        JSON.parse(String(init?.body)) as Record<string, unknown>,
+      );
+      return Response.json("11111111-1111-4111-8111-111111111111");
+    }
+    throw new Error(`Unexpected request: ${url}`);
+  };
+  const env = {
+    ...baseEnv,
+    ASSETS: {
+      fetch: async (request: Request) => {
+        assert.equal(new URL(request.url).pathname, "/data/opportunities.json");
+        return Response.json({
+          records: [
+            {
+              id: "existing-grant",
+              provider: "Example Foundation",
+              title: "Existing Grant",
+              category: "funding",
+              subcategories: ["research-funding"],
+              tags: ["open-source"],
+              description: "Existing public description.",
+              eligibility: "Existing public eligibility.",
+              value: "$1,000",
+              sourceUrl: "https://example.org/grant",
+              officialUrl: "https://example.org/grant/apply",
+              status: "unconfirmed",
+              reviewDate: "2025-01-01",
+              reviewedAt: "2025-01-01T12:00:00Z",
+            },
+          ],
+        });
+      },
+    },
+  } satisfies Env;
+  try {
+    const response = await worker.fetch(
+      new Request(
+        "https://fork.example/api/moderation/listings/existing-grant/updates",
+        {
+          method: "POST",
+          headers: {
+            cookie: "pc_moderator_session=test-session",
+            origin: "https://fork.example",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            normalized: {
+              title: "Existing Grant",
+              organization: "Example Foundation",
+              primary_category: "funding",
+              categories: ["funding"],
+              subcategories: ["research-funding"],
+              tags: ["open-source"],
+              description: "A moderator-researched factual description.",
+              eligibility: "Open-source maintainers may apply.",
+              benefits: "$1,000 in funding.",
+              location: "Global",
+              deadline: "",
+              resource_type: "funding",
+              default_search_eligible: true,
+              availability_status: "open",
+              status_reason: "Applications are open on the official page.",
+              deadline_type: "none",
+              global: true,
+              remote: true,
+              countries: [],
+              program_url: "https://example.org/grant",
+              provider_url: "https://example.org",
+              application_url: "https://example.org/grant/apply",
+              claims_checked: [
+                "program-exists",
+                "eligibility",
+                "benefit",
+                "application-url",
+              ],
+              next_review_at: "2026-10-24",
+              sponsored: false,
+              sponsorship_type: "",
+              sponsorship_disclosure: "",
+            },
+          }),
+        },
+      ),
+      env,
+    );
+    assert.equal(response.status, 202);
+    assert.equal(rpcBodies[0]?.p_target_listing_id, "existing-grant");
+    assert.equal(
+      rpcBodies[0]?.p_original_created_at,
+      "2025-01-01T12:00:00Z",
+    );
+    assert.equal(
+      (rpcBodies[0]?.p_normalized as Record<string, unknown>)
+        .availability_status,
+      "open",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

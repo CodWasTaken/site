@@ -5,6 +5,7 @@ import type { PublishedOpportunity } from "./publication-data";
 // separately reviewed owner authorization after Build Week.
 const DATA_REPOSITORY = "CodWasTaken/data";
 const SITE_REPOSITORY = "CodWasTaken/site";
+const FORK_OWNER = "CodWasTaken";
 const DATA_BRANCH = "main";
 const GITHUB_API_VERSION = "2026-03-10";
 
@@ -88,7 +89,7 @@ export const createPublicationPullRequest = async (
   const branch = publicationBranch(batchId);
   const existingPulls = await githubRequest<GithubPullRequest[]>(
     token,
-    `/repos/${DATA_REPOSITORY}/pulls?state=open&base=${DATA_BRANCH}&head=PerkCommons:${branch}`,
+    `/repos/${DATA_REPOSITORY}/pulls?state=open&base=${DATA_BRANCH}&head=${FORK_OWNER}:${branch}`,
   );
   if (existingPulls?.[0]) return existingPulls[0];
 
@@ -185,7 +186,7 @@ export const createRemovalPullRequest = async (
   const branch = removalBranch(batchId);
   const existingPulls = await githubRequest<GithubPullRequest[]>(
     token,
-    `/repos/${DATA_REPOSITORY}/pulls?state=open&base=${DATA_BRANCH}&head=PerkCommons:${branch}`,
+    `/repos/${DATA_REPOSITORY}/pulls?state=open&base=${DATA_BRANCH}&head=${FORK_OWNER}:${branch}`,
   );
   if (existingPulls?.[0])
     return { baseSha: existingPulls[0].head.sha, pullRequest: existingPulls[0] };

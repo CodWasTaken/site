@@ -87,9 +87,9 @@ const asRecord = (value: unknown): Record<string, unknown> => {
 };
 
 const submissionSelect =
-  "id,name,organization,categories,primary_category,subcategories,tags,description,eligibility,benefits,location,deadline,source_url,organization_website_url,submitter_name,submitter_email,submitter_notes,status,risk_score,flag_count,submission_country_code,created_at,updated_at,reviewed_at,published_at,last_action_at,decision_reason";
+  "id,name,organization,categories,primary_category,subcategories,tags,description,eligibility,benefits,location,deadline,source_url,organization_website_url,submitter_name,submitter_email,submitter_notes,status,risk_score,flag_count,submission_country_code,created_at,updated_at,reviewed_at,published_at,last_action_at,decision_reason,submission_kind,target_listing_id,proposed_by_moderator,original_created_at";
 const submissionSummarySelect =
-  "id,name,organization,primary_category,status,risk_score,flag_count,submission_country_code,created_at,updated_at";
+  "id,name,organization,primary_category,status,risk_score,flag_count,submission_country_code,created_at,updated_at,submission_kind,target_listing_id";
 
 export async function createSession(
   request: Request,
@@ -177,10 +177,14 @@ export async function submissionDetail(
   id: string,
 ): Promise<Response> {
   await requireModerator(request, env);
-  const [submission, flags, actions] = await Promise.all([
+  const [submission, normalized, flags, actions] = await Promise.all([
     supabaseRequest<unknown[]>(
       env,
       `/rest/v1/opportunity_submissions?id=eq.${encodeURIComponent(id)}&select=${submissionSelect}&limit=1`,
+    ),
+    supabaseRequest<unknown[]>(
+      env,
+      `/rest/v1/normalized_opportunities?submission_id=eq.${encodeURIComponent(id)}&select=*&limit=1`,
     ),
     supabaseRequest<unknown[]>(
       env,
@@ -195,6 +199,7 @@ export async function submissionDetail(
     return apiError("Submission was not found.", 404, "not_found");
   return json({
     submission: submission.data[0],
+    normalized: normalized.data[0] ?? null,
     flags: flags.data,
     actions: actions.data,
   });
@@ -345,6 +350,221 @@ const normalizedData = (value: unknown): Record<string, unknown> => {
     next_review_at: nextReviewAt,
   };
 };
+
+interface CatalogSummary {
+  id: string;
+  provider: string;
+  title: string;
+  description: string;
+  benefit: string;
+  category: string;
+  categoryLabel: string;
+  status: string;
+  reviewDate: string;
+  resourceType: string;
+  defaultSearchEligible: boolean | null;
+  canonicalUrl: string;
+  destinationUrl: string;
+}
+
+interface ExportedListing {
+  id: string;
+  provider: string;
+  title: string;
+  category: string;
+  subcategories: string[];
+  tags: string[];
+  description: string;
+  eligibility: string;
+  value: string;
+  sourceUrl: string;
+  officialUrl: string;
+  status: string;
+  reviewDate: string;
+  resourceType?: string;
+  defaultSearchEligible?: boolean | null;
+  providerUrl?: string | null;
+  programUrl?: string | null;
+  applicationUrl?: string | null;
+  deadline?: string | null;
+  deadlineType?: string | null;
+  global?: boolean | null;
+  remote?: boolean | null;
+  countries?: string[];
+  regions?: string[];
+  reviewedAt?: string | null;
+  nextReviewAt?: string | null;
+  claimsChecked?: string[];
+  sponsor?: boolean;
+}
+
+const staticRecords = async <T>(
+  request: Request,
+  env: Env,
+  assetPath: string,
+): Promise<T[]> => {
+  const asset = await env.ASSETS.fetch(
+    new Request(new URL(assetPath, request.url), { method: "GET" }),
+  );
+  if (!asset.ok)
+    throw new RequestError(
+      "The catalogue asset is unavailable.",
+      503,
+      "catalogue_unavailable",
+    );
+  // These are bounded, build-generated assets owned by this Worker deployment.
+  const payload = await asset.json<{ records?: unknown }>();
+  if (!Array.isArray(payload.records))
+    throw new RequestError(
+      "The catalogue asset is invalid.",
+      503,
+      "catalogue_unavailable",
+    );
+  return payload.records as T[];
+};
+
+const queueCursor = (value: string | null): number => {
+  if (!value) return 0;
+  try {
+    const offset = Number.parseInt(atob(value), 10);
+    if (!Number.isSafeInteger(offset) || offset < 0) throw new Error();
+    return offset;
+  } catch {
+    throw new RequestError(
+      "Queue cursor is invalid.",
+      400,
+      "invalid_cursor",
+    );
+  }
+};
+
+export async function unconfirmedListings(
+  request: Request,
+  env: Env,
+): Promise<Response> {
+  await requireModerator(request, env);
+  const url = new URL(request.url);
+  const categoryParameter = url.searchParams.get("category");
+  const category = categoryParameter
+    ? normalizeCategoryId(categoryParameter)
+    : null;
+  if (categoryParameter && !category)
+    throw new RequestError(
+      "Unknown opportunity category.",
+      400,
+      "invalid_category",
+    );
+  const search = (url.searchParams.get("search") ?? "").trim().toLowerCase();
+  if (search.length > 120)
+    throw new RequestError("Search is too long.", 400, "validation_failed");
+  const limit = Math.min(
+    50,
+    Math.max(
+      1,
+      Number.parseInt(url.searchParams.get("limit") ?? "25", 10) || 25,
+    ),
+  );
+  const offset = queueCursor(url.searchParams.get("cursor"));
+  const records = (await staticRecords<CatalogSummary>(
+    request,
+    env,
+    "/catalog-index.json",
+  ))
+    .filter((record) => record.status === "unconfirmed")
+    .filter((record) => !category || record.category === category)
+    .filter(
+      (record) =>
+        !search ||
+        [
+          record.id,
+          record.provider,
+          record.title,
+          record.description,
+          record.benefit,
+        ].some((field) => field.toLowerCase().includes(search)),
+    )
+    .sort(
+      (left, right) =>
+        left.reviewDate.localeCompare(right.reviewDate) ||
+        left.provider.localeCompare(right.provider) ||
+        left.title.localeCompare(right.title) ||
+        left.id.localeCompare(right.id),
+    );
+  const listings = records.slice(offset, offset + limit);
+  const nextOffset = offset + listings.length;
+  return json({
+    queue: "unconfirmed",
+    total: records.length,
+    count: listings.length,
+    nextCursor: nextOffset < records.length ? btoa(String(nextOffset)) : null,
+    listings,
+  });
+}
+
+export async function canonicalListingDetail(
+  request: Request,
+  env: Env,
+  id: string,
+): Promise<Response> {
+  await requireModerator(request, env);
+  const validId = listingId(id);
+  const records = await staticRecords<ExportedListing>(
+    request,
+    env,
+    "/data/opportunities.json",
+  );
+  const listing = records.find((record) => record.id === validId);
+  if (!listing)
+    return apiError("Listing was not found.", 404, "not_found");
+  return json({ listing });
+}
+
+export async function createListingUpdate(
+  request: Request,
+  env: Env,
+  id: string,
+): Promise<Response> {
+  assertSameOrigin(request);
+  const moderator = await requireModerator(request, env);
+  const validId = listingId(id);
+  const records = await staticRecords<ExportedListing>(
+    request,
+    env,
+    "/data/opportunities.json",
+  );
+  const listing = records.find((record) => record.id === validId);
+  if (!listing)
+    return apiError("Listing was not found.", 404, "not_found");
+  const body = asRecord(await readJson(request, 20_000));
+  const normalized = normalizedData(body);
+  const { data: activeUpdates } = await supabaseRequest<Array<{ id: string }>>(
+    env,
+    `/rest/v1/opportunity_submissions?submission_kind=eq.listing_update&target_listing_id=eq.${encodeURIComponent(validId)}&status=in.(pending,reviewing,flagged,approved)&select=id&limit=1`,
+  );
+  if (activeUpdates[0])
+    throw new RequestError(
+      "This listing already has an update awaiting review or publication.",
+      409,
+      "listing_update_pending",
+    );
+  const originalCreatedAt =
+    listing.reviewedAt || `${listing.reviewDate}T00:00:00.000Z`;
+  const submissionId = await callRpc<string>(env, "create_listing_update", {
+    p_moderator_id: moderator.userId,
+    p_target_listing_id: validId,
+    p_original_created_at: originalCreatedAt,
+    p_normalized: normalized,
+  });
+  return json(
+    {
+      message:
+        "Listing update queued for human review. It will not change Git until separately approved and published.",
+      submission_id: submissionId,
+      target_listing_id: validId,
+    },
+    202,
+  );
+}
 
 export async function moderationAction(
   request: Request,

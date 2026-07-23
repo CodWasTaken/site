@@ -5,6 +5,8 @@ import { reconcilePublicationBatches } from "./lib/publication";
 import { reconcileListingRemovals } from "./lib/removal";
 import {
   bans,
+  canonicalListingDetail,
+  createListingUpdate,
   createBan,
   createSession,
   currentModerator,
@@ -23,6 +25,7 @@ import {
   reports,
   resolveReport,
   submissionDetail,
+  unconfirmedListings,
 } from "./routes/moderation";
 import {
   handlePublicError,
@@ -37,6 +40,10 @@ const submissionDetailPattern =
 const banPattern = /^\/api\/moderation\/bans\/([0-9a-f-]+)$/i;
 const reportPattern = /^\/api\/moderation\/reports\/([0-9a-f-]+)\/resolve$/i;
 const featurePattern = /^\/api\/moderation\/listings\/([a-z0-9-]+)\/feature$/;
+const listingUpdatePattern =
+  /^\/api\/moderation\/listings\/([a-z0-9-]+)\/updates$/;
+const canonicalListingPattern =
+  /^\/api\/moderation\/listings\/([a-z0-9-]+)$/;
 const publicListingPattern = /^\/opportunities\/([a-z0-9-]+)\/?$/;
 
 async function publicCatalogApi(request: Request, env: Env): Promise<Response | null> {
@@ -113,6 +120,10 @@ async function api(request: Request, env: Env): Promise<Response> {
       return request.method === "GET"
         ? await reports(request, env)
         : methodNotAllowed();
+    if (path === "/api/moderation/listings/unconfirmed")
+      return request.method === "GET"
+        ? await unconfirmedListings(request, env)
+        : methodNotAllowed();
     if (path === "/api/moderation/moderators")
       return request.method === "GET" || request.method === "POST"
         ? await moderators(request, env)
@@ -135,6 +146,20 @@ async function api(request: Request, env: Env): Promise<Response> {
     if (featureMatch?.[1])
       return request.method === "POST"
         ? await featureListing(request, env, featureMatch[1])
+        : methodNotAllowed();
+    const listingUpdateMatch = path.match(listingUpdatePattern);
+    if (listingUpdateMatch?.[1])
+      return request.method === "POST"
+        ? await createListingUpdate(request, env, listingUpdateMatch[1])
+        : methodNotAllowed();
+    const canonicalListingMatch = path.match(canonicalListingPattern);
+    if (canonicalListingMatch?.[1])
+      return request.method === "GET"
+        ? await canonicalListingDetail(
+            request,
+            env,
+            canonicalListingMatch[1],
+          )
         : methodNotAllowed();
     const detailMatch = path.match(submissionDetailPattern);
     if (detailMatch?.[1])

@@ -45,6 +45,7 @@ test("greenfield migration creates every Worker database boundary", async () => 
     "finalize_listing_removal_batch",
     "claim_submission",
     "complete_second_review",
+    "create_listing_update",
   ])
     assert.match(sql, new RegExp(`function public\\.${rpc}\\b`));
 });

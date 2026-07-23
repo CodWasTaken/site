@@ -1,6 +1,6 @@
 # PerkCommons Next experimental-fork handoff
 
-Prepared 2026-07-23. This handoff covers local branches in personal forks owned by `CodWasTaken`. It is not a production release and does not represent the official PerkCommons implementation.
+Prepared 2026-07-24. This handoff covers local branches in personal forks owned by `CodWasTaken`. It is not a production release and does not represent the official PerkCommons implementation.
 
 ## Completed work
 
@@ -21,6 +21,15 @@ Prepared 2026-07-23. This handoff covers local branches in personal forks owned 
 - Scoped and cached public listing-state reads, validated report targets against a static manifest/tombstones, and suppressed duplicate open reports without exposing whether a report already exists.
 - Added centralized report-only CSP and security headers, separate intake rate-limit bindings, edge-first tombstone suppression, fail-closed configured tombstone access, and independent publication/removal cron settlement.
 - Added a minimized moderation queue-summary endpoint and an unapplied SQL migration contract for assignment, revision, conflict-of-interest, and distinct second-review enforcement.
+- Added a public-data-only unconfirmed-listing queue with exact counts,
+  category/search filters, oldest-review-first ordering and incremental
+  loading. Moderators can open the shared v2 editor and create an audited
+  pending update proposal for the same stable listing ID; nothing is
+  auto-approved or written directly to Git.
+- Added the fork-only `202607240001_listing_update_workflow.sql` incremental
+  migration and regenerated the empty-project baseline. The migration prevents
+  overlapping active updates and carries canonical identity through validated
+  publication.
 - Added a generated, empty-project Supabase baseline containing the complete private fork schema, final RPCs, RLS, grants, triggers and retention schedule.
 - Replaced deploy automation with a credential-free fork dry run pinned to an exact data SHA. Automation targets only `CodWasTaken/*`.
 - Added an isolated `perkcommons-next-fork-dev` Worker environment for local and later `workers.dev` testing, with distinct rate-limit namespaces, no custom route, no cron and no GitHub automation secrets.
@@ -61,11 +70,11 @@ Only the personal fork branches were pushed. No official branch, pull request or
 | data | `npm audit` | 0 known vulnerabilities after transitive lock update |
 | site | `npm ci` | completed; no credentials used |
 | site | `npm run check` | Astro and TypeScript checks passed |
-| site | `npm test` | 49 passed, 0 failed |
+| site | `npm test` | 53 passed, 0 failed |
 | site | greenfield SQL on disposable PostgreSQL 17 | schema and end-to-end RPC smoke test passed; real pg_cron was represented by matching local signatures |
 | site | `npm run build` | 1,095 static routes built; 779 default-eligible detail pages indexed |
-| site | `npm run test:browser` | final full Chromium desktop/mobile run: 52 passed, 4 intentionally skipped, 0 failed |
-| site | `npm run worker:dry-run` | Wrangler 4.113.0 bundled 3,359 assets for the named `dev` environment and exited without authentication or deployment |
+| site | `npm run test:browser` | final full Chromium desktop/mobile run: 54 passed, 4 intentionally skipped, 0 failed |
+| site | `npm run worker:dry-run` | Wrangler 4.113.0 read 3,064 assets for the named `dev` environment and exited without authentication or deployment |
 | site | local `wrangler dev --env dev --local` smoke | homepage and six security headers, catalogue API and sitemap returned 200; unknown API returned 404 |
 | site | hosted `perkcommons-next-fork-dev` smoke | homepage, listing, catalogue API, sitemap and Supabase-backed listing state returned 200; unknown API returned 404; six security headers present |
 | branding | `jq empty` plus SVG presence checks | passed |
@@ -99,8 +108,15 @@ tombstone KV binding and must not be represented as the official site.
 - The search index is lazy but remains approximately 1 MB uncompressed. Shard-first loading and representative ranking fixtures remain work.
 - Provider pages, original audience guides, comparison UI, separate sitemaps, structured deadlines, and benefit-aware sorting are deferred.
 - Submission tracking references, correction/withdrawal flows, and multiple structured evidence inputs remain deferred.
-- The minimized queue summary exists, but the current moderation UI still needs modular state, saved views, dedicated private detail/reveal auditing, selectable publication batches, operational metrics, and richer report decisions.
-- The SQL review-concurrency and publication-semantics migrations are isolated proposals only. Neither has been applied to any Supabase project. Existing approved rows require human re-review before v2 publication.
+- The unconfirmed queue is now a focused browser module, but the remaining
+  moderation UI still needs modular state, saved views, dedicated private
+  detail/reveal auditing, selectable publication batches, operational metrics,
+  and richer report decisions.
+- The SQL review-concurrency, publication-semantics and listing-update
+  migrations are isolated fork changes. The new listing editor requires
+  `202607240001_listing_update_workflow.sql` in an existing isolated database;
+  it has not been applied from this workspace. Existing approved rows require
+  human re-review before v2 publication.
 - The greenfield baseline was not applied to a hosted Supabase project. It requires Supabase-managed Auth/API roles and the pg_cron extension; validate it once more with `supabase db reset` in the future isolated fork project.
 - Edge tombstones require an isolated KV namespace before hosted testing. No namespace was created and no production binding was contacted.
 - Hosted test submissions are not yet Turnstile-protected; do not promote or broadly advertise the test Worker before the fork-only widget is configured.

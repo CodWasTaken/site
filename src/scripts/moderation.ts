@@ -11,9 +11,19 @@ import {
   categories,
   subcategoryLabel,
 } from "../lib/taxonomy";
+import {
+  createUnconfirmedQueueController,
+  type CanonicalListing,
+} from "./moderation/unconfirmed";
 
 type QueueName =
-  "pending" | "flagged" | "approved" | "rejected" | "published" | "reports";
+  | "pending"
+  | "flagged"
+  | "unconfirmed"
+  | "approved"
+  | "rejected"
+  | "published"
+  | "reports";
 type DialogElement = HTMLDialogElement & { showModal(): void };
 
 const element = <T extends HTMLElement>(selector: string): T => {
@@ -25,6 +35,7 @@ const element = <T extends HTMLElement>(selector: string): T => {
 const workspace = element<HTMLElement>("#review-workspace");
 const reportsView = element<HTMLElement>("#reports-view");
 const archiveView = element<HTMLElement>("#archive-view");
+const unconfirmedView = element<HTMLElement>("#unconfirmed-view");
 const queueState = element<HTMLElement>("#queue-state");
 const actionBar = element<HTMLElement>("#review-actions");
 const card = element<HTMLElement>("#review-card");
@@ -40,6 +51,9 @@ let moderatorRole: "reviewer" | "admin" = "reviewer";
 let undoTarget: string | null = null;
 let undoTimer: number | undefined;
 let publicationTimer: number | undefined;
+let approvalMode: "submission" | "listing-update" = "submission";
+let listingUpdateTarget: CanonicalListing | null = null;
+let unconfirmedSearchTimer: number | undefined;
 
 interface PublicationBatch {
   id: string;
@@ -104,19 +118,33 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return payload;
 }
 
+const unconfirmedController = createUnconfirmedQueueController({
+  api,
+  onEdit: (id) => void openListingUpdate(id),
+  onCount: setQueueLabels,
+});
+
 function setLoading(message = "Loading submissions...") {
   queueState.textContent = message;
   show(queueState, true);
   show(workspace, false);
   show(reportsView, false);
   show(archiveView, false);
+  show(unconfirmedView, false);
   show(actionBar, false);
 }
 
 function setQueueLabels(count: number) {
-  element("#queue-name").textContent = titleCase(activeQueue);
+  element("#queue-name").textContent =
+    activeQueue === "unconfirmed" ? "Unconfirmed listings" : titleCase(activeQueue);
   element("#queue-count").textContent =
-    `${count} ${activeQueue === "reports" ? "reports" : "submissions"}`;
+    `${count} ${
+      activeQueue === "reports"
+        ? "reports"
+        : activeQueue === "unconfirmed"
+          ? "listings"
+          : "submissions"
+    }`;
   element("#queue-position").textContent =
     count && (activeQueue === "pending" || activeQueue === "flagged")
       ? `${position + 1} of ${count}`
@@ -230,6 +258,7 @@ function renderSubmission() {
   show(queueState, false);
   show(reportsView, false);
   show(archiveView, false);
+  show(unconfirmedView, false);
   show(workspace, true);
   const reviewable = activeQueue === "pending" || activeQueue === "flagged";
   show(actionBar, reviewable);
@@ -331,11 +360,16 @@ function renderSubmission() {
 async function loadDetail(id: string) {
   try {
     const data = await api<{
+      normalized: Record<string, unknown> | null;
       flags: ModerationContext["flags"];
       actions: ModerationContext["actions"];
     }>(`/api/moderation/submissions/${id}`);
     if (current()?.id !== id) return;
-    currentContext = { flags: data.flags ?? [], actions: data.actions ?? [] };
+    currentContext = {
+      normalized: data.normalized,
+      flags: data.flags ?? [],
+      actions: data.actions ?? [],
+    };
     renderHistory(currentContext);
   } catch (error) {
     announcer.textContent =
@@ -351,6 +385,7 @@ function renderReports(reports: Array<Record<string, unknown>>) {
   show(actionBar, false);
   show(reportsView, true);
   show(archiveView, false);
+  show(unconfirmedView, false);
   const list = element("#reports-list");
   list.replaceChildren();
   if (!reports.length) {
@@ -406,6 +441,7 @@ function renderArchive() {
   show(reportsView, false);
   show(actionBar, false);
   show(archiveView, true);
+  show(unconfirmedView, false);
   setQueueLabels(submissions.length);
   const list = element("#archive-list");
   const purgeAll = element("#purge-rejected-button");
@@ -525,6 +561,10 @@ async function loadQueue(queueName: QueueName = activeQueue) {
   );
   setQueueLabels(0);
   categoryFilter.disabled = queueName === "reports";
+  show(
+    element("#unconfirmed-search-label"),
+    queueName === "unconfirmed",
+  );
   try {
     if (queueName === "reports") {
       const result = await api<{
@@ -533,6 +573,14 @@ async function loadQueue(queueName: QueueName = activeQueue) {
       }>("/api/moderation/reports");
       setQueueLabels(result.count);
       renderReports(result.reports);
+      return;
+    }
+    if (queueName === "unconfirmed") {
+      unconfirmedController.reset();
+      await unconfirmedController.load(
+        categoryFilter.value,
+        element<HTMLInputElement>("#unconfirmed-search").value.trim(),
+      );
       return;
     }
     const result = await api<{
@@ -593,44 +641,187 @@ async function purgeRejected(id: string | null) {
   }
 }
 
+function fillApprovalForm(
+  values: Record<string, unknown>,
+  selectedSubcategories: string[],
+  selectedClaims: string[],
+) {
+  const form = element<HTMLFormElement>("#approve-form");
+  const assign = (name: string, value: unknown) => {
+    const field = form.elements.namedItem(name) as
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
+    if (field)
+      field.value =
+        value === null || value === undefined
+          ? ""
+          : typeof value === "boolean"
+            ? String(value)
+            : String(value);
+  };
+  const primaryCategory = String(values.primary_category ?? "");
+  for (const name of [
+    "title",
+    "organization",
+    "primary_category",
+    "tags",
+    "description",
+    "eligibility",
+    "benefits",
+    "location",
+    "deadline",
+    "deadline_type",
+    "resource_type",
+    "default_search_eligible",
+    "availability_status",
+    "status_reason",
+    "global",
+    "remote",
+    "countries",
+    "program_url",
+    "provider_url",
+    "application_url",
+    "next_review_at",
+    "sponsored",
+    "sponsorship_type",
+    "sponsorship_disclosure",
+  ])
+    assign(name, values[name]);
+  assign("primary_category", primaryCategory);
+  updateApprovalSubcategories(primaryCategory, selectedSubcategories);
+  form.querySelectorAll<HTMLInputElement>('input[name="claims_checked"]')
+    .forEach((input) => {
+      input.checked = selectedClaims.includes(input.value);
+    });
+}
+
 function populateApproval() {
   const submission = current();
   if (!submission) return;
-  const form = element<HTMLFormElement>("#approve-form");
-  const assign = (name: string, value: string | null) => {
-    const field = form.elements.namedItem(name) as
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
-    if (field) field.value = value ?? "";
-  };
-  assign("title", submission.name);
-  assign("organization", submission.organization);
+  approvalMode = "submission";
+  listingUpdateTarget = null;
+  const draft = currentContext.normalized;
   const primaryCategory = moderationCategory(submission);
-  assign("primary_category", primaryCategory);
-  assign("tags", submission.tags.join(", "));
-  updateApprovalSubcategories(primaryCategory, submission.subcategories);
-  assign("description", submission.description);
-  assign("eligibility", submission.eligibility);
-  assign("benefits", submission.benefits);
-  assign("location", submission.location);
-  assign("deadline", submission.deadline);
-  assign("deadline_type", submission.deadline ? "fixed" : "unknown");
-  assign("resource_type", "");
-  assign("default_search_eligible", "");
-  assign("availability_status", "");
-  assign("status_reason", "");
-  assign("global", submission.location?.trim().toLowerCase() === "global" ? "true" : "unknown");
-  assign("remote", submission.location?.trim().toLowerCase() === "remote" ? "true" : "unknown");
-  assign("countries", "");
-  assign("program_url", submission.source_url);
-  assign("provider_url", submission.organization_website_url);
-  assign("application_url", "");
-  assign("next_review_at", "");
-  assign("sponsored", "unknown");
-  assign("sponsorship_type", "");
-  assign("sponsorship_disclosure", "");
-  form.querySelectorAll<HTMLInputElement>('input[name="claims_checked"]')
-    .forEach((input) => { input.checked = false; });
+  fillApprovalForm(
+    draft
+      ? {
+          ...draft,
+          tags: Array.isArray(draft.tags)
+            ? draft.tags.join(", ")
+            : "",
+          countries: Array.isArray(draft.countries)
+            ? draft.countries.join(", ")
+            : "",
+          global: draft.global ?? "unknown",
+          remote: draft.remote ?? "unknown",
+          sponsored: draft.sponsored ?? "unknown",
+        }
+      : {
+          title: submission.name,
+          organization: submission.organization,
+          primary_category: primaryCategory,
+          tags: submission.tags.join(", "),
+          description: submission.description,
+          eligibility: submission.eligibility,
+          benefits: submission.benefits,
+          location: submission.location,
+          deadline: submission.deadline,
+          deadline_type: submission.deadline ? "fixed" : "unknown",
+          resource_type: "",
+          default_search_eligible: "",
+          availability_status: "",
+          status_reason: "",
+          global:
+            submission.location?.trim().toLowerCase() === "global"
+              ? "true"
+              : "unknown",
+          remote:
+            submission.location?.trim().toLowerCase() === "remote"
+              ? "true"
+              : "unknown",
+          countries: "",
+          program_url: submission.source_url,
+          provider_url: submission.organization_website_url,
+          application_url: "",
+          next_review_at: "",
+          sponsored: "unknown",
+          sponsorship_type: "",
+          sponsorship_disclosure: "",
+        },
+    Array.isArray(draft?.subcategories)
+      ? draft.subcategories.map(String)
+      : submission.subcategories,
+    Array.isArray(draft?.claims_checked)
+      ? draft.claims_checked.map(String)
+      : [],
+  );
+  text("#approve-heading", "Normalize approved listing");
+  text(
+    "#approve-description",
+    "Approval creates a normalized public-ready record. An administrator must include it in a validated publication batch before it appears publicly.",
+  );
+  text("#approve-submit", "Approve and save");
   openDialog("#approve-dialog");
+}
+
+async function openListingUpdate(id: string) {
+  try {
+    const result = await api<{ listing: CanonicalListing }>(
+      `/api/moderation/listings/${id}`,
+    );
+    const listing = result.listing;
+    approvalMode = "listing-update";
+    listingUpdateTarget = listing;
+    fillApprovalForm(
+      {
+        title: listing.title,
+        organization: listing.provider,
+        primary_category: listing.category,
+        tags: listing.tags.join(", "),
+        description: listing.description,
+        eligibility: listing.eligibility,
+        benefits: listing.value,
+        location: listing.regions?.join(", ") ?? "",
+        deadline: listing.deadline ?? "",
+        deadline_type:
+          listing.deadlineType ?? (listing.deadline ? "fixed" : "unknown"),
+        resource_type: listing.resourceType ?? "opportunity",
+        default_search_eligible:
+          typeof listing.defaultSearchEligible === "boolean"
+            ? String(listing.defaultSearchEligible)
+            : "",
+        availability_status: listing.status,
+        status_reason: "",
+        global:
+          typeof listing.global === "boolean" ? String(listing.global) : "unknown",
+        remote:
+          typeof listing.remote === "boolean" ? String(listing.remote) : "unknown",
+        countries: (listing.countries ?? []).join(", "),
+        program_url:
+          listing.programUrl ?? listing.sourceUrl ?? listing.officialUrl,
+        provider_url: listing.providerUrl ?? "",
+        application_url: listing.applicationUrl ?? "",
+        next_review_at: listing.nextReviewAt ?? "",
+        sponsored:
+          typeof listing.sponsor === "boolean"
+            ? String(listing.sponsor)
+            : "unknown",
+        sponsorship_type: "",
+        sponsorship_disclosure: "",
+      },
+      listing.subcategories,
+      listing.claimsChecked ?? [],
+    );
+    text("#approve-heading", `Review and update ${listing.title}`);
+    text(
+      "#approve-description",
+      "Saving creates a pending, audited update proposal for this stable listing ID. It does not modify Git or the public site until the proposal is separately approved and published.",
+    );
+    text("#approve-submit", "Queue update for review");
+    openDialog("#approve-dialog");
+  } catch (error) {
+    announcer.textContent =
+      error instanceof Error ? error.message : "Could not open the listing.";
+  }
 }
 
 function updateApprovalSubcategories(
@@ -817,6 +1008,23 @@ element("#queue-tabs").addEventListener("click", (event) => {
 });
 element("#refresh-queue").addEventListener("click", () => void loadQueue());
 categoryFilter.addEventListener("change", () => void loadQueue());
+element("#load-more-unconfirmed").addEventListener("click", () =>
+  void unconfirmedController.load(
+    categoryFilter.value,
+    element<HTMLInputElement>("#unconfirmed-search").value.trim(),
+    true,
+  ),
+);
+element<HTMLInputElement>("#unconfirmed-search").addEventListener(
+  "input",
+  () => {
+    if (unconfirmedSearchTimer !== undefined)
+      window.clearTimeout(unconfirmedSearchTimer);
+    unconfirmedSearchTimer = window.setTimeout(() => {
+      if (activeQueue === "unconfirmed") void loadQueue("unconfirmed");
+    }, 250);
+  },
+);
 element("#logout-button").addEventListener("click", async () => {
   await api("/api/auth/logout", { method: "POST", body: "{}" });
   location.assign("/moderator-login/");
@@ -864,7 +1072,7 @@ document.querySelectorAll<DialogElement>("dialog").forEach((item) =>
 
 element<HTMLFormElement>("#approve-form").addEventListener(
   "submit",
-  (event) => {
+  async (event) => {
     event.preventDefault();
     const form = event.currentTarget as HTMLFormElement;
     if (!form.reportValidity()) return;
@@ -883,7 +1091,7 @@ element<HTMLFormElement>("#approve-form").addEventListener(
       .split(",")
       .map((country) => country.trim().toUpperCase())
       .filter((country, index, values) => country && values.indexOf(country) === index);
-    void performAction("approve", {
+    const payload = {
       normalized: {
         title: data.get("title"),
         organization: data.get("organization"),
@@ -913,7 +1121,26 @@ element<HTMLFormElement>("#approve-form").addEventListener(
         sponsorship_type: data.get("sponsorship_type"),
         sponsorship_disclosure: data.get("sponsorship_disclosure"),
       },
-    });
+    };
+    if (approvalMode === "listing-update" && listingUpdateTarget) {
+      try {
+        const result = await api<{ message: string }>(
+          `/api/moderation/listings/${listingUpdateTarget.id}/updates`,
+          { method: "POST", body: JSON.stringify(payload) },
+        );
+        closeDialogs();
+        announcer.textContent = result.message;
+        listingUpdateTarget = null;
+        await loadQueue("pending");
+      } catch (error) {
+        announcer.textContent =
+          error instanceof Error
+            ? error.message
+            : "Could not queue the listing update.";
+      }
+      return;
+    }
+    await performAction("approve", payload);
   },
 );
 element<HTMLSelectElement>("#approval-category").addEventListener(
