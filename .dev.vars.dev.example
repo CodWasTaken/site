@@ -1,0 +1,15 @@
+# Copy this file to .dev.vars.dev for `npm run dev:worker`.
+# Use credentials from the isolated fork/test Supabase project only.
+SUPABASE_URL=
+SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+
+# Generate a local-only value, for example:
+# openssl rand -hex 32
+SUBMISSION_FINGERPRINT_SECRET=
+
+# Turnstile remains disabled until the fork-only widget is configured.
+# TURNSTILE_SITE_KEY=
+# TURNSTILE_SECRET_KEY=
+
+# Deliberately omit GitHub publication/deployment tokens in development.

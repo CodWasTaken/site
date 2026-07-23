@@ -51,6 +51,8 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` implemented, `[t]` tested, `
 - [t] Publication and removal cron reconciliation use `Promise.allSettled`.
 - [x] Fork automation targets `CodWasTaken/*`; official repositories are not automation targets.
 - [t] Fork workflow accepts exact data SHA and performs credential-free build plus Wrangler dry run only.
+- [t] Named `dev` Worker uses a distinct `workers.dev` target, test-only rate-limit namespaces, no route, no cron and no GitHub automation secrets.
+- [t] Static-asset `_headers` policy matches Worker responses; local runtime probe confirmed all six headers on the homepage.
 - [d] Reason-sensitive tombstone policy, KV reconciliation, static tombstone feed and production smoke verification.
 - [d] Worker-signed session replacing the reusable Supabase access token cookie.
 - [d] GitHub App installation-token integration.
@@ -73,10 +75,11 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` implemented, `[t]` tested, `
 
 - [t] Data: `npm test` — 10/10 passed after changes.
 - [t] Clean installs: `npm ci` completed in data and site without using credentials.
-- [t] Site: `npm test` — 43/43 passed after changes.
+- [t] Site: `npm test` — 47/47 passed after changes.
 - [t] Site: `npm run build` — 1,095 static routes built; Pagefind indexed 1,068 detail pages.
 - [t] Browser: final full Chromium desktop/mobile suite — 50 passed, 4 intentionally skipped, 0 failed.
-- [t] Wrangler 4.113.0 dry run bundled 3,358 static assets and exited without authentication or deployment.
+- [t] Wrangler 4.113.0 `dev` dry run bundled 3,359 static assets and exited without authentication or deployment.
+- [t] Local Wrangler runtime: homepage/security headers, paginated catalogue API and sitemap returned 200; unknown API returned 404.
 - [t] Branding JSON/SVG workflow checks passed locally.
 - [b] Docs' exact offline Lychee check was not executable locally because the Lychee binary is not installed.
 - [t] Data dependency audit reports zero known vulnerabilities after updating the transitive `fast-uri` lock.

@@ -17,12 +17,20 @@ Create `.env.local` from `.env.example` with the two `PUBLIC_` values for Astro.
 The public Supabase key is used only for moderator authentication; it has no
 direct access to moderation tables.
 
-To exercise Worker APIs locally, create an ignored `.dev.vars` containing the
-runtime variables from `.env.example`, then run:
+To exercise Worker APIs locally, copy the environment-specific, ignored Worker
+secret template and fill it with credentials from the isolated fork Supabase
+project:
 
 ```sh
+cp .dev.vars.dev.example .dev.vars.dev
 npm run dev:worker
 ```
+
+This starts the named `dev` environment locally. It uses the
+`perkcommons-next-fork-dev` Worker configuration, test-only rate-limit
+namespaces, no custom-domain route, no cron triggers, and no GitHub publication
+or deployment credentials. Turnstile remains disabled until its fork-only
+widget is configured.
 
 `npm run fetch:data` replaces `.data/` with a shallow clone of the public
 dataset. Production builds run it automatically. Set
@@ -56,19 +64,24 @@ npm run test:browser
 Browser tests mock Supabase and moderation APIs. They do not write to the
 production project.
 
-## Deployment
+## Fork Worker validation
 
-Configure the Cloudflare Git integration with:
+Generate and check the Cloudflare binding contract, then create a deployment
+bundle without authenticating or deploying:
 
-- Build command: `npm run build`
-- Deploy command: `npx wrangler deploy`
-- Root directory: `/`
+```sh
+npm run worker:types
+npm run worker:dry-run
+```
 
-Set `PUBLIC_SUPABASE_URL` and `PUBLIC_SUPABASE_PUBLISHABLE_KEY` as Cloudflare
-build variables and GitHub Actions repository variables. Set Worker runtime
-values with `wrangler secret put`; never place the service-role key or
-fingerprinting secret in build variables or frontend code.
+If a hosted test Worker is authorized later, deploy only the named environment
+with `npx wrangler deploy --env dev`. It publishes to the distinct
+`perkcommons-next-fork-dev` Worker on `workers.dev`; do not add a
+`perkcommons.com` route. Set runtime values with
+`npx wrangler secret put <NAME> --env dev`; never place the service-role key or
+fingerprinting secret in build variables, frontend code, or tracked files.
 
 Wrangler deploys `dist/` through Workers Static Assets and runs
 `worker/index.ts` first for `/api/*` and `/moderate/*`. The canonical public URL
-remains `https://perkcommons.com`.
+of the official project remains `https://perkcommons.com`; this fork must not
+claim or modify it.

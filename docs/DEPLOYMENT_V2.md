@@ -1,6 +1,8 @@
 # Deployment version 2
 
-The only workflow on this branch is a fork dry run. It must not be configured with production Cloudflare credentials and never calls a live deploy command.
+The automated workflow on this branch is a fork dry run. It must not be configured with production Cloudflare credentials and never calls a live deploy command. Manual development testing uses only the named `dev` Wrangler environment, whose Worker name is `perkcommons-next-fork-dev`, with `workers.dev` enabled, no custom-domain route, no cron triggers and test-only rate-limit namespaces.
+
+Local Worker secrets belong in ignored `.dev.vars.dev`; hosted development secrets must be written with `wrangler secret put <NAME> --env dev`. GitHub publication/deployment tokens are intentionally absent. The official Worker, routes, credentials and `perkcommons.com` are out of scope.
 
 ## Required immutable inputs
 

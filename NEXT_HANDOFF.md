@@ -1,6 +1,6 @@
 # PerkCommons Next experimental-fork handoff
 
-Prepared 2026-07-22. This handoff covers local branches in personal forks owned by `CodWasTaken`. It is not a production release and does not represent the official PerkCommons implementation.
+Prepared 2026-07-23. This handoff covers local branches in personal forks owned by `CodWasTaken`. It is not a production release and does not represent the official PerkCommons implementation.
 
 ## Completed work
 
@@ -20,6 +20,8 @@ Prepared 2026-07-22. This handoff covers local branches in personal forks owned 
 - Added a minimized moderation queue-summary endpoint and an unapplied SQL migration contract for assignment, revision, conflict-of-interest, and distinct second-review enforcement.
 - Added a generated, empty-project Supabase baseline containing the complete private fork schema, final RPCs, RLS, grants, triggers and retention schedule.
 - Replaced deploy automation with a credential-free fork dry run pinned to an exact data SHA. Automation targets only `CodWasTaken/*`.
+- Added an isolated `perkcommons-next-fork-dev` Worker environment for local and later `workers.dev` testing, with distinct rate-limit namespaces, no custom route, no cron and no GitHub automation secrets.
+- Added static-asset security headers so pages that bypass Worker execution receive the same report-only CSP and browser protections.
 - Added architecture, migration, moderation, search, deployment, security, risk, governance, and implementation-status documentation.
 
 ## Forks and branches
@@ -55,11 +57,12 @@ No branch or commit was pushed during this project.
 | data | `npm audit` | 0 known vulnerabilities after transitive lock update |
 | site | `npm ci` | completed; no credentials used |
 | site | `npm run check` | Astro and TypeScript checks passed |
-| site | `npm test` | 43 passed, 0 failed |
+| site | `npm test` | 47 passed, 0 failed |
 | site | greenfield SQL on disposable PostgreSQL 17 | schema and end-to-end RPC smoke test passed; real pg_cron was represented by matching local signatures |
 | site | `npm run build` | 1,095 static routes built; 1,068 detail pages indexed |
 | site | `npm run test:browser` | final full Chromium desktop/mobile run: 50 passed, 4 intentionally skipped, 0 failed |
-| site | `wrangler deploy --dry-run --outdir <isolated-temp-directory>` | Wrangler 4.113.0 bundled 3,358 assets and exited without authentication or deployment |
+| site | `npm run worker:dry-run` | Wrangler 4.113.0 bundled 3,359 assets for the named `dev` environment and exited without authentication or deployment |
+| site | local `wrangler dev --env dev --local` smoke | homepage and six security headers, catalogue API and sitemap returned 200; unknown API returned 404 |
 | branding | `jq empty` plus SVG presence checks | passed |
 | docs | exact offline Lychee workflow | not run: Lychee is not installed locally |
 
