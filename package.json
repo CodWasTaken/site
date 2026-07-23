@@ -11,7 +11,9 @@
     "prebuild": "npm run fetch:data",
     "build": "astro check && astro build && pagefind --site dist",
     "preview": "astro preview",
-    "check": "node scripts/sync-taxonomy.mjs --check && astro check && tsc --noEmit && tsc -p worker/tsconfig.json --noEmit && tsc -p worker/tests/tsconfig.json --noEmit",
+    "check": "node scripts/sync-taxonomy.mjs --check && node scripts/build-greenfield-migration.mjs --check && astro check && tsc --noEmit && tsc -p worker/tsconfig.json --noEmit && tsc -p worker/tests/tsconfig.json --noEmit",
+    "greenfield:generate": "node scripts/build-greenfield-migration.mjs",
+    "greenfield:check": "node scripts/build-greenfield-migration.mjs --check",
     "test": "npm run check && npm run test:unit",
     "test:unit": "tsx --test tests/unit/*.test.ts worker/tests/*.test.ts",
     "test:browser": "playwright test"
