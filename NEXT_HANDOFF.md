@@ -12,6 +12,7 @@ Prepared 2026-07-23. This handoff covers local branches in personal forks owned 
 - Isolated all importers behind candidate envelopes; importers no longer write into the canonical published directory or hard-code review dates.
 - Replaced the 1,068-card directory DOM with a static-first 24-card first page, lazy weighted search, URL-persistent filters, sorting, and incremental loading.
 - Applied the scope decision consistently to homepage/category listings, default directory search, and Pagefind. The 779 default opportunities remain discoverable; typed resources can be reached only after an explicit resource-type opt-in.
+- Corrected 1,011 importer-generated `limited` availability values to `unconfirmed` without claiming that sources are currently open. All 18 importers now emit unreviewed candidates as `unconfirmed`, and regression checks prevent that blanket default from returning.
 - Generated static JSON/JSONL/CSV exports, search/facet/provider/category/audience assets, schema, OpenAPI, tombstone/change-feed placeholders, compatibility metadata, and a paginated public API facade.
 - Improved branded cards, status presentation, detail-page URL semantics, convenience actions, and submission autosave/duplicate warning behavior.
 - Corrected the canonical v1 schema domain with a compatibility alias and taught the site to consume both v1 and v2 records without flattening v2 status, URLs, deadlines, geography or provenance.
@@ -52,7 +53,7 @@ No branch or commit was pushed during this project.
 | --- | --- | --- |
 | data | `npm ci` | completed; no credentials used |
 | data | `npm run check` | generated artifacts and 289 explicit scope decisions current; all 1,068 mixed-schema records valid |
-| data | `npm test` | 13 passed, 0 failed |
+| data | `npm test` | 15 passed, 0 failed |
 | data | `npm run reports -- --as-of 2026-07-23` | all required scope/quality/duplicate/stale reports regenerated; 289 excluded and 779 default-eligible |
 | data | `npm run migrate:v2` | 1,068/1,068 results valid; 779 v1 migrated in memory, 289 v2 validated, 10,448 unresolved markers; no records written |
 | data | `npm audit` | 0 known vulnerabilities after transitive lock update |
