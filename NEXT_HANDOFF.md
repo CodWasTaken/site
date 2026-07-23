@@ -18,6 +18,7 @@ Prepared 2026-07-22. This handoff covers local branches in personal forks owned 
 - Scoped and cached public listing-state reads, validated report targets against a static manifest/tombstones, and suppressed duplicate open reports without exposing whether a report already exists.
 - Added centralized report-only CSP and security headers, separate intake rate-limit bindings, edge-first tombstone suppression, fail-closed configured tombstone access, and independent publication/removal cron settlement.
 - Added a minimized moderation queue-summary endpoint and an unapplied SQL migration contract for assignment, revision, conflict-of-interest, and distinct second-review enforcement.
+- Added a generated, empty-project Supabase baseline containing the complete private fork schema, final RPCs, RLS, grants, triggers and retention schedule.
 - Replaced deploy automation with a credential-free fork dry run pinned to an exact data SHA. Automation targets only `CodWasTaken/*`.
 - Added architecture, migration, moderation, search, deployment, security, risk, governance, and implementation-status documentation.
 
@@ -54,7 +55,8 @@ No branch or commit was pushed during this project.
 | data | `npm audit` | 0 known vulnerabilities after transitive lock update |
 | site | `npm ci` | completed; no credentials used |
 | site | `npm run check` | Astro and TypeScript checks passed |
-| site | `npm test` | 41 passed, 0 failed |
+| site | `npm test` | 43 passed, 0 failed |
+| site | greenfield SQL on disposable PostgreSQL 17 | schema and end-to-end RPC smoke test passed; real pg_cron was represented by matching local signatures |
 | site | `npm run build` | 1,095 static routes built; 1,068 detail pages indexed |
 | site | `npm run test:browser` | final full Chromium desktop/mobile run: 50 passed, 4 intentionally skipped, 0 failed |
 | site | `wrangler deploy --dry-run --outdir <isolated-temp-directory>` | Wrangler 4.113.0 bundled 3,358 assets and exited without authentication or deployment |
@@ -84,6 +86,7 @@ Open `http://127.0.0.1:4322/`. The build resolves the adjacent isolated `data` f
 - Submission tracking references, correction/withdrawal flows, and multiple structured evidence inputs remain deferred.
 - The minimized queue summary exists, but the current moderation UI still needs modular state, saved views, dedicated private detail/reveal auditing, selectable publication batches, operational metrics, and richer report decisions.
 - The SQL review-concurrency and publication-semantics migrations are isolated proposals only. Neither has been applied to any Supabase project. Existing approved rows require human re-review before v2 publication.
+- The greenfield baseline was not applied to a hosted Supabase project. It requires Supabase-managed Auth/API roles and the pg_cron extension; validate it once more with `supabase db reset` in the future isolated fork project.
 - Edge tombstones require an isolated KV namespace before hosted testing. No namespace was created and no production binding was contacted.
 - GitHub App authentication, exact hosted deployment state, production-equivalent smoke verification, and publication/removal dashboards remain proposals.
 - Firefox, WebKit/Safari, Axe, screen-reader, forced-colors, high-contrast, 200%/400% zoom, and manual device verification remain outstanding.
@@ -100,8 +103,8 @@ Open `http://127.0.0.1:4322/`. The build resolves the adjacent isolated `data` f
 
 ## Database and deployment requirements
 
-1. Review `supabase/migrations/202607220001_next_review_concurrency.sql` and `202607220002_publication_semantics.sql` with privacy/security and editorial owners.
-2. Apply them in order only to a disposable fork Supabase project, test rollback and RLS, then run concurrency, second-review and v2 publication integration tests. Re-review pre-migration approved rows; do not backfill editorial facts.
+1. For a new isolated project, copy only `supabase/greenfield/00000000000000_perkcommons_fork.sql` into its empty migration directory. Do not combine it with the incremental chain.
+2. Run `supabase db reset`, inspect all RLS/grants, then exercise concurrency, second-review, v2 publication, retention and removal integration tests. Re-review imported or pre-existing approvals; do not backfill editorial facts.
 3. Provision an isolated tombstone KV store and isolated Turnstile/rate-limit configuration; never reuse production identifiers or secrets.
 4. Pin the exact site commit, data commit, schema version, taxonomy version, and minimum migration in the compatibility manifest.
 5. Run the credential-free dry-run workflow first, then deploy only to a distinct non-production hostname after explicit authorization.

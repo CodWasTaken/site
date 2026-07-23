@@ -65,13 +65,15 @@ Legend: `[ ]` not started, `[~]` in progress, `[x]` implemented, `[t]` tested, `
 - [t] Isolated migration contract adds optimistic revision and distinct second-review enforcement; migration was not applied.
 - [t] Approval now requires explicit resource type, availability, deadline semantics, URL purposes, geography, sponsorship and checked claims; publication emits schema v2 without editorial defaults.
 - [t] Isolated publication-semantics migration persists the new fields and deliberately blocks older approved rows until human re-review; migration was not applied.
+- [t] Deterministic greenfield Supabase baseline creates the missing root submission table and squashes all nine fork migrations into one empty-project transaction.
+- [t] Greenfield baseline validated on disposable PostgreSQL 17: 13 tables, RLS/private grants, v2 approval, publication batching, report/removal batching and retention scheduling.
 - [d] Selectable publication batches and field-level preview.
 
 ## Validation evidence
 
 - [t] Data: `npm test` — 10/10 passed after changes.
 - [t] Clean installs: `npm ci` completed in data and site without using credentials.
-- [t] Site: `npm test` — 41/41 passed after changes.
+- [t] Site: `npm test` — 43/43 passed after changes.
 - [t] Site: `npm run build` — 1,095 static routes built; Pagefind indexed 1,068 detail pages.
 - [t] Browser: final full Chromium desktop/mobile suite — 50 passed, 4 intentionally skipped, 0 failed.
 - [t] Wrangler 4.113.0 dry run bundled 3,358 static assets and exited without authentication or deployment.
