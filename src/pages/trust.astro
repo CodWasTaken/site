@@ -1,0 +1,122 @@
+---
+import { ExternalLink, Github, Mail, ShieldCheck } from "lucide-astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  title="Trust and transparency — PerkCommons"
+  description="Who operates PerkCommons, how the project is funded, how listings are reviewed, what submission data is collected, and how to report a problem."
+>
+  <section class="container py-14">
+    <p class="text-sm font-semibold text-brand">Trust and transparency</p>
+    <h1 class="mt-2 max-w-3xl text-4xl font-semibold">
+      An open project with clear editorial accountability.
+    </h1>
+    <p class="mt-5 max-w-3xl text-lg leading-8 text-muted">
+      PerkCommons is an open-source project operated by Cod, an individual
+      based in Poland. This page explains who is responsible for the project,
+      how it is funded, how records are reviewed, and how to raise a concern.
+    </p>
+
+    <div class="mt-12 grid gap-6 md:grid-cols-2">
+      <section class="rounded-md border border-line bg-surface p-6">
+        <h2 class="text-xl font-semibold">Operator and funding</h2>
+        <p class="mt-3 leading-7 text-muted">
+          PerkCommons is currently operated by Cod. The project is
+          self-funded, and the only direct project expense paid so far has
+          been the domain registration for perkcommons.com.
+        </p>
+      </section>
+
+      <section class="rounded-md border border-line bg-surface p-6">
+        <h2 class="text-xl font-semibold">No pay-to-list model</h2>
+        <p class="mt-3 leading-7 text-muted">
+          Ordinary listings are not paid placements, sponsored placements, or
+          affiliate links. Payment does not purchase factual approval,
+          verification, ranking, or removal of another listing.
+        </p>
+      </section>
+
+      <section class="rounded-md border border-line bg-surface p-6">
+        <h2 class="flex items-center gap-2 text-xl font-semibold">
+          <ShieldCheck size={20} aria-hidden="true" /> Human moderation
+        </h2>
+        <p class="mt-3 leading-7 text-muted">
+          Records are checked by hand by moderators using available official
+          and public sources. Moderators can correct or remove a record when
+          information is inaccurate, expired, unsafe, duplicated, or otherwise
+          unsuitable for the directory.
+        </p>
+        <p class="mt-3 text-sm leading-6 text-muted">
+          A source check is not a guarantee of eligibility, availability, or
+          outcome. The program provider controls the final terms.
+        </p>
+      </section>
+
+      <section class="rounded-md border border-line bg-surface p-6">
+        <h2 class="text-xl font-semibold">Submission information</h2>
+        <p class="mt-3 leading-7 text-muted">
+          When someone submits an opportunity, PerkCommons may collect the
+          information entered in the form, an optional email address, and
+          approximate geolocation such as a country code. Technical request
+          information may also be processed for moderation and abuse
+          prevention. Submitter email addresses are not published.
+        </p>
+        <a class="mt-4 inline-flex items-center gap-2 font-medium" href="/privacy/">
+          Read the privacy notice <ExternalLink size={16} aria-hidden="true" />
+        </a>
+      </section>
+    </div>
+
+    <section class="mt-14 border-t border-line pt-10">
+      <h2 class="text-2xl font-semibold">Open-source repositories</h2>
+      <p class="mt-3 max-w-3xl leading-7 text-muted">
+        The Next development version is maintained in Cod's personal forks.
+        The original PerkCommons project remains available under the official
+        PerkCommons GitHub organization.
+      </p>
+      <div class="mt-6 grid gap-4 sm:grid-cols-2">
+        <div class="rounded-md border border-line bg-surface p-5">
+          <p class="font-semibold">Next development version</p>
+          <div class="mt-3 space-y-2 text-sm">
+            <a class="flex items-center gap-2" href="https://github.com/CodWasTaken/site" rel="noopener">
+              <Github size={16} aria-hidden="true" /> Site repository
+            </a>
+            <a class="flex items-center gap-2" href="https://github.com/CodWasTaken/data" rel="noopener">
+              <Github size={16} aria-hidden="true" /> Data repository
+            </a>
+            <a class="flex items-center gap-2" href="https://github.com/CodWasTaken/docs" rel="noopener">
+              <Github size={16} aria-hidden="true" /> Documentation repository
+            </a>
+            <a class="flex items-center gap-2" href="https://github.com/CodWasTaken/branding" rel="noopener">
+              <Github size={16} aria-hidden="true" /> Branding repository
+            </a>
+          </div>
+        </div>
+        <div class="rounded-md border border-line bg-surface p-5">
+          <p class="font-semibold">Original PerkCommons project</p>
+          <a class="mt-3 flex items-center gap-2 text-sm" href="https://github.com/PerkCommons" rel="noopener">
+            <Github size={16} aria-hidden="true" /> PerkCommons GitHub organization
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="mt-14 border-t border-line pt-10">
+      <h2 class="text-2xl font-semibold">Report a problem</h2>
+      <p class="mt-3 max-w-3xl leading-7 text-muted">
+        To report inaccurate, expired, unsafe, or misleading information, open
+        the relevant listing and select <strong>Report this listing</strong>.
+        You can also contact the project by email.
+      </p>
+      <div class="mt-5 flex flex-wrap gap-3">
+        <a class="inline-flex items-center gap-2 rounded-md bg-action px-5 py-3 font-medium text-white no-underline" href="/opportunities/">
+          Browse listings
+        </a>
+        <a class="inline-flex items-center gap-2 rounded-md border border-line bg-surface px-5 py-3 font-medium no-underline" href="mailto:hello@perkcommons.com?subject=PerkCommons%20report">
+          <Mail size={18} aria-hidden="true" /> Email PerkCommons
+        </a>
+      </div>
+    </section>
+  </section>
+</BaseLayout>
