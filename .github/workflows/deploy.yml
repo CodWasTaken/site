@@ -1,34 +1,77 @@
-name: Deploy to Cloudflare Workers
+name: Deploy Next dev to Cloudflare Workers
+
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+
 permissions:
   contents: read
+
+concurrency:
+  group: perkcommons-next-fork-dev
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: PerkCommons/data
-          path: .data
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+
       - run: npm ci
+
       - run: npm test
         env:
           PUBLIC_SUPABASE_URL: ${{ vars.PUBLIC_SUPABASE_URL }}
           PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+
       - run: npm run build
         env:
+          PERKCOMMONS_DATA_REPOSITORY: https://github.com/CodWasTaken/data.git
+          PERKCOMMONS_DATA_REF: main
           PERKCOMMONS_DATA_PATH: ${{ github.workspace }}/.data/opportunities
           PUBLIC_SUPABASE_URL: ${{ vars.PUBLIC_SUPABASE_URL }}
           PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
           PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.PUBLIC_TURNSTILE_SITE_KEY }}
-      - run: npx wrangler deploy
+
+      - name: Deploy isolated Next dev Worker
+        run: npx wrangler deploy --config wrangler.next-dev.jsonc
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Verify trust pages on Next dev
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://perkcommons-next-fork-dev.cod3eater.workers.dev"
+
+          verify_page() {
+            local path="$1"
+            local marker="$2"
+
+            for attempt in {1..18}; do
+              body="$(curl --fail --silent --show-error "$base$path" || true)"
+              if grep -Fq "$marker" <<<"$body"; then
+                echo "Verified $path"
+                return 0
+              fi
+
+              echo "Waiting for $path to contain the expected content (attempt $attempt/18)"
+              sleep 10
+            done
+
+            echo "The deployed page $path did not contain the expected content." >&2
+            return 1
+          }
+
+          verify_page "/trust/" "Trust and transparency"
+          verify_page "/privacy/" "A plain-language privacy notice."
+          verify_page "/about/" "operated by Cod from Poland"
