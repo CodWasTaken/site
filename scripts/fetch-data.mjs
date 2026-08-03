@@ -5,7 +5,9 @@ import { spawn } from "node:child_process";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const destination = resolve(repositoryRoot, ".data");
-const dataRepository = "https://github.com/PerkCommons/data.git";
+const dataRepository =
+  process.env.PERKCOMMONS_DATA_REPOSITORY?.trim() ||
+  "https://github.com/PerkCommons/data.git";
 const dataRef = process.env.PERKCOMMONS_DATA_REF?.trim();
 
 await rm(destination, { recursive: true, force: true });
