@@ -1,3 +1,4 @@
+import { next } from "@vercel/functions";
 import { requireModerator } from "./worker/lib/auth";
 import { isListingRemovedWithoutEdgeCache } from "./worker/lib/listing-state";
 import { vercelEnv } from "./vercel/runtime-env";
@@ -6,11 +7,6 @@ export const listingIdFromPath = (pathname: string): string | null => {
   const match = pathname.match(/^\/opportunities\/([a-z0-9-]+)\/?$/);
   return match?.[1] ?? null;
 };
-
-const continueRouting = (): Response =>
-  new Response(null, {
-    headers: { "x-middleware-next": "1" },
-  });
 
 const removedListingResponse = (): Response =>
   new Response(
@@ -59,7 +55,7 @@ export default async function middleware(request: Request): Promise<Response> {
     }
   }
 
-  return continueRouting();
+  return next();
 }
 
 export const config = {
