@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
-          repository: PerkCommons/data
+          repository: CodWasTaken/data
           path: .data
       - uses: actions/setup-node@v4
         with:
@@ -30,9 +30,28 @@ jobs:
           PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
           PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.PUBLIC_TURNSTILE_SITE_KEY }}
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:browser
+      - name: Run browser tests with diagnostics
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:browser 2>&1 | tee playwright-output.txt
+          status=${PIPESTATUS[0]}
+          {
+            echo '## Playwright diagnostic tail'
+            echo '```text'
+            tail -n 200 playwright-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
         env:
           PERKCOMMONS_DATA_PATH: ${{ github.workspace }}/.data/opportunities
           PUBLIC_SUPABASE_URL: ${{ vars.PUBLIC_SUPABASE_URL }}
           PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
           PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.PUBLIC_TURNSTILE_SITE_KEY }}
+      - name: Upload Playwright diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-diagnostics
+          path: playwright-output.txt
+          if-no-files-found: warn
