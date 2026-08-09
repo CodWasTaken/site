@@ -1,3 +1,5 @@
+import { requestSiteDeployment, siteDeploymentConfigured } from "./deployment";
+import { githubTargetConfig } from "./github-targets";
 import { RequestError } from "./http";
 import {
   publicationListingId,
@@ -6,7 +8,6 @@ import {
 } from "./publication-data";
 import {
   createPublicationPullRequest,
-  dispatchSiteDeployment,
   getPublicationChecks,
   getPublicationPullRequest,
   mergePublicationPullRequest,
@@ -96,12 +97,14 @@ export const startPublicationBatch = async (
   env: Env,
   moderator: Moderator,
 ): Promise<PublicationBatch | null> => {
-  if (!env.GITHUB_DATA_PUBLICATION_TOKEN || !env.GITHUB_SITE_DEPLOY_TOKEN)
+  if (!env.GITHUB_DATA_PUBLICATION_TOKEN || !siteDeploymentConfigured(env))
     throw new RequestError(
       "Automated publication is not configured.",
       503,
       "publication_not_configured",
     );
+
+  const target = githubTargetConfig(env);
   const batchId = await callRpc<string | null>(env, "begin_publication_batch", {
     p_moderator_id: moderator.userId,
   });
@@ -122,6 +125,7 @@ export const startPublicationBatch = async (
   try {
     const pullRequest = await createPublicationPullRequest(
       env.GITHUB_DATA_PUBLICATION_TOKEN,
+      target,
       batchId,
       opportunities,
     );
@@ -160,15 +164,17 @@ export const publicationBatchStatus = async (
     ),
   ]);
   const contentRange = approvedResult.response.headers.get("content-range");
-  const approvedCount = Number(contentRange?.split("/")[1] ?? approvedResult.data.length);
+  const approvedCount = Number(
+    contentRange?.split("/")[1] ?? approvedResult.data.length,
+  );
   return {
     batch: batchResult.data[0] ?? null,
     approved_count: Number.isFinite(approvedCount) ? approvedCount : 0,
   };
 };
 
-const requestSiteDeployment = async (env: Env, batchId: string) => {
-  await dispatchSiteDeployment(env.GITHUB_SITE_DEPLOY_TOKEN);
+const requestSiteRebuild = async (env: Env, batchId: string) => {
+  await requestSiteDeployment(env);
   await updateBatch(env, batchId, {
     deployment_requested_at: new Date().toISOString(),
   });
@@ -183,13 +189,15 @@ const finalizeBatch = async (
     p_batch_id: batch.id,
     p_merge_sha: mergeSha,
   });
-  await requestSiteDeployment(env, batch.id);
+  await requestSiteRebuild(env, batch.id);
 };
 
 const reconcileBatch = async (env: Env, batch: PublicationBatch) => {
   if (!batch.github_pr_number) return;
+  const target = githubTargetConfig(env);
   const pullRequest = await getPublicationPullRequest(
     env.GITHUB_DATA_PUBLICATION_TOKEN,
+    target,
     batch.github_pr_number,
   );
   if (!pullRequest) return;
@@ -212,6 +220,7 @@ const reconcileBatch = async (env: Env, batch: PublicationBatch) => {
     await updateBatch(env, batch.id, { github_head_sha: pullRequest.head.sha });
   const checks = await getPublicationChecks(
     env.GITHUB_DATA_PUBLICATION_TOKEN,
+    target,
     pullRequest.head.sha,
   );
   const validation = checks.find((check) => check.name === "validate");
@@ -226,6 +235,7 @@ const reconcileBatch = async (env: Env, batch: PublicationBatch) => {
   });
   const merge = await mergePublicationPullRequest(
     env.GITHUB_DATA_PUBLICATION_TOKEN,
+    target,
     batch.github_pr_number,
     pullRequest.head.sha,
     batch.item_count,
@@ -263,7 +273,7 @@ export const reconcilePublicationBatches = async (env: Env): Promise<void> => {
   );
   for (const batch of awaitingDeployment) {
     try {
-      await requestSiteDeployment(env, batch.id);
+      await requestSiteRebuild(env, batch.id);
     } catch (error) {
       console.error(
         JSON.stringify({

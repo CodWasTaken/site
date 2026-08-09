@@ -1,6 +1,7 @@
+import { requestSiteDeployment, siteDeploymentConfigured } from "./deployment";
+import { githubTargetConfig } from "./github-targets";
 import {
   createRemovalPullRequest,
-  dispatchSiteDeployment,
   getPublicationChecks,
   getPublicationPullRequest,
   mergeRemovalPullRequest,
@@ -45,8 +46,8 @@ const updateBatch = async (
   );
 };
 
-const requestSiteDeployment = async (env: Env, batchId: string) => {
-  await dispatchSiteDeployment(env.GITHUB_SITE_DEPLOY_TOKEN);
+const requestSiteRebuild = async (env: Env, batchId: string) => {
+  await requestSiteDeployment(env);
   await updateBatch(env, batchId, {
     deployment_requested_at: new Date().toISOString(),
   });
@@ -61,7 +62,7 @@ const finalizeBatch = async (
     p_batch_id: batch.id,
     p_merge_sha: mergeSha,
   });
-  await requestSiteDeployment(env, batch.id);
+  await requestSiteRebuild(env, batch.id);
 };
 
 const prepareBatch = async (
@@ -69,8 +70,10 @@ const prepareBatch = async (
   batch: ListingRemovalBatch,
 ): Promise<ListingRemovalBatch> => {
   try {
+    const target = githubTargetConfig(env);
     const result = await createRemovalPullRequest(
       env.GITHUB_DATA_PUBLICATION_TOKEN,
+      target,
       batch.id,
       batch.listing_id,
     );
@@ -109,8 +112,10 @@ export const prepareListingRemovalForReport = async (
 
 const reconcileBatch = async (env: Env, batch: ListingRemovalBatch) => {
   if (!batch.github_pr_number) return;
+  const target = githubTargetConfig(env);
   const pullRequest = await getPublicationPullRequest(
     env.GITHUB_DATA_PUBLICATION_TOKEN,
+    target,
     batch.github_pr_number,
   );
   if (!pullRequest) return;
@@ -133,6 +138,7 @@ const reconcileBatch = async (env: Env, batch: ListingRemovalBatch) => {
     await updateBatch(env, batch.id, { github_head_sha: pullRequest.head.sha });
   const checks = await getPublicationChecks(
     env.GITHUB_DATA_PUBLICATION_TOKEN,
+    target,
     pullRequest.head.sha,
   );
   const validation = checks.find((check) => check.name === "validate");
@@ -147,6 +153,7 @@ const reconcileBatch = async (env: Env, batch: ListingRemovalBatch) => {
   await updateBatch(env, batch.id, { status: "merging", last_error_code: null });
   const merge = await mergeRemovalPullRequest(
     env.GITHUB_DATA_PUBLICATION_TOKEN,
+    target,
     batch.github_pr_number,
     pullRequest.head.sha,
     batch.listing_id,
@@ -160,7 +167,7 @@ const reconcileBatch = async (env: Env, batch: ListingRemovalBatch) => {
 };
 
 export const reconcileListingRemovals = async (env: Env): Promise<void> => {
-  if (!env.GITHUB_DATA_PUBLICATION_TOKEN || !env.GITHUB_SITE_DEPLOY_TOKEN) return;
+  if (!env.GITHUB_DATA_PUBLICATION_TOKEN || !siteDeploymentConfigured(env)) return;
   const { data: active } = await supabaseRequest<ListingRemovalBatch[]>(
     env,
     `/rest/v1/listing_removal_batches?status=in.(preparing,validating,merging)&select=${batchFields}&order=created_at.asc&limit=10`,
@@ -186,7 +193,7 @@ export const reconcileListingRemovals = async (env: Env): Promise<void> => {
   );
   for (const batch of awaitingDeployment) {
     try {
-      await requestSiteDeployment(env, batch.id);
+      await requestSiteRebuild(env, batch.id);
     } catch (error) {
       console.error(
         JSON.stringify({

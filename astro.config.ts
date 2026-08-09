@@ -2,8 +2,15 @@ import sitemap from "@astrojs/sitemap";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "astro/config";
 
+const vercelProductionHost = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+const site =
+  process.env.PUBLIC_SITE_URL?.trim() ??
+  (vercelProductionHost
+    ? `https://${vercelProductionHost}`
+    : "https://perkcommons.com");
+
 export default defineConfig({
-  site: "https://perkcommons.com",
+  site,
   output: "static",
   integrations: [
     sitemap({
