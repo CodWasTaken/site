@@ -20,6 +20,7 @@
     "@astrojs/sitemap": "^3.7.3",
     "@supabase/supabase-js": "^2.110.7",
     "@tailwindcss/vite": "^4.3.3",
+    "@vercel/functions": "^3.9.1",
     "astro": "^7.1.0",
     "lucide-astro": "^0.556.0",
     "tailwindcss": "^4.3.3"
