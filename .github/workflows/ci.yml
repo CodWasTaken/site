@@ -29,6 +29,14 @@ jobs:
           PUBLIC_SUPABASE_URL: ${{ vars.PUBLIC_SUPABASE_URL }}
           PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
           PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.PUBLIC_TURNSTILE_SITE_KEY }}
+      - name: Diagnose public browser configuration
+        shell: bash
+        run: |
+          if grep -R -Fq "kglyikactodqfxoimgyw.supabase.co" dist; then
+            echo "Public Supabase hostname is present in the built browser bundle."
+          else
+            echo "Public Supabase hostname is MISSING from the built browser bundle."
+          fi
       - run: npx playwright install --with-deps chromium
       - name: Run browser tests with diagnostics
         shell: bash
