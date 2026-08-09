@@ -9,13 +9,20 @@ export type SubmissionStatus =
   | "withdrawn";
 
 export interface Env {
-  ASSETS: { fetch(request: Request): Promise<Response> };
+  ASSETS?: { fetch(request: Request): Promise<Response> };
   SUPABASE_URL: string;
   SUPABASE_PUBLISHABLE_KEY: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
   SUBMISSION_FINGERPRINT_SECRET: string;
   GITHUB_DATA_PUBLICATION_TOKEN?: string;
   GITHUB_SITE_DEPLOY_TOKEN?: string;
+  GITHUB_DATA_REPOSITORY?: string;
+  GITHUB_DATA_BRANCH?: string;
+  GITHUB_HEAD_OWNER?: string;
+  GITHUB_SITE_REPOSITORY?: string;
+  FORK_ONLY_MODE?: string;
+  VERCEL_DEPLOY_HOOK_URL?: string;
+  CRON_SECRET?: string;
   TURNSTILE_SECRET_KEY?: string;
   SUBMISSION_RATE_LIMITER?: {
     limit(options: { key: string }): Promise<{ success: boolean }>;
