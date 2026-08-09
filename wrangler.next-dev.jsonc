@@ -4,6 +4,13 @@
   "compatibility_date": "2026-07-17",
   "main": "./worker/index.ts",
   "workers_dev": true,
+  "vars": {
+    "GITHUB_DATA_REPOSITORY": "CodWasTaken/data",
+    "GITHUB_DATA_BRANCH": "main",
+    "GITHUB_HEAD_OWNER": "CodWasTaken",
+    "GITHUB_SITE_REPOSITORY": "CodWasTaken/site",
+    "FORK_ONLY_MODE": "true"
+  },
   "assets": {
     "binding": "ASSETS",
     "directory": "./dist",
