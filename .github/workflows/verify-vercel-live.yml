@@ -14,18 +14,35 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Diagnose fresh Next Vercel deployment
+      - name: Verify current public Next alias
         shell: bash
         run: |
           set -euo pipefail
-          base="https://perkcommons-next-bkt0nxm2n-cod-s-projects1.vercel.app"
-          code=$(curl -sS -L -D /tmp/headers -o /tmp/home.html -w '%{http_code}' "$base/")
-          echo "HTTP_STATUS=$code"
-          grep -Ei '^(HTTP/|content-type:|location:|server:|x-vercel-|cache-control:)' /tmp/headers || true
-          echo "--- body start ---"
-          head -c 1600 /tmp/home.html | tr '\n' ' '
-          echo
+          base="https://perkcommons-next-dev-final-cod-s-projects1.vercel.app"
+          expected_data_sha="db80383717ded0e29af497d36894c52bde8a01fa"
+
+          code=$(curl -sS -L -o /tmp/home.html -w '%{http_code}' "$base/")
+          echo "home HTTP_STATUS=$code"
           test "$code" = "200"
+          grep -F "PerkCommons <span class=\"text-xs font-normal text-muted\">Next experiment" /tmp/home.html
           grep -F "Open data. Evidence-led review." /tmp/home.html
           grep -F "Default opportunities" /tmp/home.html
           grep -F "779" /tmp/home.html
+
+          code=$(curl -sS -L -o /tmp/catalog.json -w '%{http_code}' "$base/catalog-index.json")
+          echo "catalog HTTP_STATUS=$code"
+          test "$code" = "200"
+          test "$(jq -r '.metadata.dataCommitSha' /tmp/catalog.json)" = "$expected_data_sha"
+          test "$(jq '.records | length' /tmp/catalog.json)" = "1068"
+
+          code=$(curl -sS -L -o /tmp/facets.json -w '%{http_code}' "$base/facet-counts.json")
+          echo "facets HTTP_STATUS=$code"
+          test "$code" = "200"
+          test "$(jq '[.facets.category[]] | add' /tmp/facets.json)" = "779"
+
+          code=$(curl -sS -L -o /tmp/api.json -w '%{http_code}' "$base/api/v1/opportunities?limit=1")
+          echo "api HTTP_STATUS=$code"
+          test "$code" = "200"
+          test "$(jq '.records | length' /tmp/api.json)" = "1"
+
+          echo "CURRENT_PUBLIC_NEXT_VERIFIED=$base"
