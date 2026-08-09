@@ -14,29 +14,40 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Verify public Vercel deployment
+      - name: Diagnose public Vercel deployment
         shell: bash
         run: |
           set -euo pipefail
           base="https://perkcommons-next-dev-web-cod-s-projects1.vercel.app"
 
           echo "Checking $base"
-          curl -fSsL --retry 6 --retry-delay 10 --retry-all-errors "$base/" -o /tmp/home.html
+          code=$(curl -sS -L -D /tmp/headers -o /tmp/home.html -w '%{http_code}' "$base/")
+          echo "HTTP_STATUS=$code"
+          echo "--- response headers ---"
+          grep -Ei '^(HTTP/|content-type:|location:|server:|x-vercel-|cache-control:)' /tmp/headers || true
+          echo "--- response body start ---"
+          head -c 1200 /tmp/home.html | tr '\n' ' '
+          echo
+
+          test "$code" = "200"
           grep -F "PerkCommons" /tmp/home.html
 
-          curl -fSsL --retry 3 --retry-delay 5 "$base/trust/" -o /tmp/trust.html
+          for path in trust privacy about moderator-login; do
+            code=$(curl -sS -L -o "/tmp/$path.html" -w '%{http_code}' "$base/$path/")
+            echo "$path HTTP_STATUS=$code"
+            test "$code" = "200"
+          done
+
           grep -F "Trust and transparency" /tmp/trust.html
-
-          curl -fSsL --retry 3 --retry-delay 5 "$base/privacy/" -o /tmp/privacy.html
           grep -F "A plain-language privacy notice." /tmp/privacy.html
-
-          curl -fSsL --retry 3 --retry-delay 5 "$base/about/" -o /tmp/about.html
           grep -F "operated by Cod from Poland" /tmp/about.html
+          grep -F "Moderator" /tmp/moderator-login.html
 
-          curl -fSsL --retry 3 --retry-delay 5 "$base/moderator-login/" -o /tmp/moderator.html
-          grep -F "Moderator" /tmp/moderator.html
-
-          curl -fSsL --retry 3 --retry-delay 5 "$base/api/opportunities?limit=1" -o /tmp/api.json
+          code=$(curl -sS -L -o /tmp/api.json -w '%{http_code}' "$base/api/opportunities?limit=1")
+          echo "api HTTP_STATUS=$code"
+          head -c 500 /tmp/api.json
+          echo
+          test "$code" = "200"
           grep -F '"opportunities"' /tmp/api.json
 
           echo "VERCEL_LIVE=$base"
