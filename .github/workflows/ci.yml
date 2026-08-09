@@ -21,19 +21,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-        env:
-          PUBLIC_SUPABASE_URL: ${{ vars.PUBLIC_SUPABASE_URL }}
-          PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
       - run: npm run build
         env:
           PERKCOMMONS_DATA_REPOSITORY_PATH: ${{ github.workspace }}/.data
-          PUBLIC_SUPABASE_URL: ${{ vars.PUBLIC_SUPABASE_URL }}
-          PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
-          PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.PUBLIC_TURNSTILE_SITE_KEY }}
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
         env:
           PERKCOMMONS_DATA_REPOSITORY_PATH: ${{ github.workspace }}/.data
-          PUBLIC_SUPABASE_URL: ${{ vars.PUBLIC_SUPABASE_URL }}
-          PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
-          PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.PUBLIC_TURNSTILE_SITE_KEY }}
