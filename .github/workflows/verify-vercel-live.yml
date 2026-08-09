@@ -18,7 +18,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          base="https://perkcommons-next-dev-public-cod-s-projects1.vercel.app"
+          base="https://perkcommons-next-dev-live-cod-s-projects1.vercel.app"
 
           echo "Checking $base"
           code=$(curl -sS -L -D /tmp/headers -o /tmp/home.html -w '%{http_code}' "$base/")
