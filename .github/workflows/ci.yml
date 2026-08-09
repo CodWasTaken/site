@@ -20,15 +20,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-        env:
-          PUBLIC_SUPABASE_URL: ${{ vars.PUBLIC_SUPABASE_URL }}
-          PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
       - run: npm run build
         env:
           PERKCOMMONS_DATA_PATH: ${{ github.workspace }}/.data/opportunities
-          PUBLIC_SUPABASE_URL: ${{ vars.PUBLIC_SUPABASE_URL }}
-          PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
-          PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.PUBLIC_TURNSTILE_SITE_KEY }}
       - name: Diagnose public browser configuration
         shell: bash
         run: |
@@ -55,9 +49,6 @@ jobs:
           exit "$status"
         env:
           PERKCOMMONS_DATA_PATH: ${{ github.workspace }}/.data/opportunities
-          PUBLIC_SUPABASE_URL: ${{ vars.PUBLIC_SUPABASE_URL }}
-          PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
-          PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.PUBLIC_TURNSTILE_SITE_KEY }}
       - name: Upload Playwright diagnostics
         if: always()
         uses: actions/upload-artifact@v4
