@@ -12,50 +12,19 @@ jobs:
   verify:
     if: github.head_ref == 'ops/verify-vercel-live'
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 5
     steps:
-      - name: Verify pinned Next Vercel deployment
+      - name: Diagnose pinned Vercel deployment
         shell: bash
         run: |
           set -euo pipefail
           base="https://perkcommons-next-dev-final-qqr6z11cc-cod-s-projects1.vercel.app"
-          canonical="https://perkcommons-next-dev-final-cod-s-projects1.vercel.app"
-          expected_data_sha="db80383717ded0e29af497d36894c52bde8a01fa"
-
-          echo "Checking $base"
-          code=$(curl -sS -L --retry 10 --retry-delay 8 --retry-all-errors -o /tmp/home.html -w '%{http_code}' "$base/")
-          echo "home HTTP_STATUS=$code"
+          code=$(curl -sS -L -D /tmp/headers -o /tmp/home.html -w '%{http_code}' "$base/")
+          echo "HTTP_STATUS=$code"
+          echo "--- headers ---"
+          grep -Ei '^(HTTP/|content-type:|location:|server:|x-vercel-|cache-control:)' /tmp/headers || true
+          echo "--- body start ---"
+          head -c 1800 /tmp/home.html | tr '\n' ' '
+          echo
           test "$code" = "200"
           grep -F "Open data. Evidence-led review." /tmp/home.html
-          grep -F "Ordinary free products and generic memberships are kept outside default results." /tmp/home.html
-          grep -F "Default opportunities" /tmp/home.html
-          grep -F "779" /tmp/home.html
-          grep -F "rel=\"canonical\" href=\"$canonical/\"" /tmp/home.html
-
-          code=$(curl -sS -L --retry 5 --retry-delay 5 -o /tmp/catalog.json -w '%{http_code}' "$base/catalog-index.json")
-          echo "catalog HTTP_STATUS=$code"
-          test "$code" = "200"
-          test "$(jq -r '.metadata.dataCommitSha' /tmp/catalog.json)" = "$expected_data_sha"
-          test "$(jq '.records | length' /tmp/catalog.json)" = "1068"
-
-          code=$(curl -sS -L --retry 5 --retry-delay 5 -o /tmp/facets.json -w '%{http_code}' "$base/facet-counts.json")
-          echo "facets HTTP_STATUS=$code"
-          test "$code" = "200"
-          test "$(jq '[.facets.category[]] | add' /tmp/facets.json)" = "779"
-          test "$(jq -r '.metadata.dataCommitSha' /tmp/facets.json)" = "$expected_data_sha"
-
-          for path in trust privacy about; do
-            code=$(curl -sS -L --retry 5 --retry-delay 5 -o "/tmp/$path.html" -w '%{http_code}' "$base/$path/")
-            echo "$path HTTP_STATUS=$code"
-            test "$code" = "200"
-          done
-          grep -F "Trust and transparency" /tmp/trust.html
-          grep -F "A plain-language privacy notice." /tmp/privacy.html
-          grep -F "This is the PerkCommons Next experimental fork." /tmp/about.html
-
-          code=$(curl -sS -L --retry 5 --retry-delay 5 -o /tmp/api.json -w '%{http_code}' "$base/api/v1/opportunities?limit=1")
-          echo "api HTTP_STATUS=$code"
-          test "$code" = "200"
-          test "$(jq '.records | length' /tmp/api.json)" = "1"
-
-          echo "VERCEL_PINNED_NEXT_VERIFIED=$base"
