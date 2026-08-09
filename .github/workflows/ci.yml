@@ -33,8 +33,10 @@ jobs:
         shell: bash
         run: |
           if grep -R -Fq "kglyikactodqfxoimgyw.supabase.co" dist; then
+            echo "present" | tee public-config-status.txt
             echo "Public Supabase hostname is present in the built browser bundle."
           else
+            echo "missing" | tee public-config-status.txt
             echo "Public Supabase hostname is MISSING from the built browser bundle."
           fi
       - run: npx playwright install --with-deps chromium
@@ -61,5 +63,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-diagnostics
-          path: playwright-output.txt
+          path: |
+            playwright-output.txt
+            public-config-status.txt
           if-no-files-found: warn
