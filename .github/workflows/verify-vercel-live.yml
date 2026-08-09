@@ -14,11 +14,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Diagnose immutable Vercel deployment
+      - name: Verify final Vercel deployment
         shell: bash
         run: |
           set -euo pipefail
-          base="https://perkcommons-next-dev-live-21z3o4n6h-cod-s-projects1.vercel.app"
+          base="https://perkcommons-next-dev-final-cod-s-projects1.vercel.app"
 
           echo "Checking $base"
           code=$(curl -sS -L -D /tmp/headers -o /tmp/home.html -w '%{http_code}' "$base/")
