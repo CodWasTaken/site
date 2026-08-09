@@ -3,6 +3,7 @@ import test from "node:test";
 import { listingIdFromPath } from "../../middleware";
 import { vercelEnv } from "../../vercel/runtime-env";
 import { routeApiRequest } from "../lib/api-router";
+import { isListingRemovedWithoutEdgeCache } from "../lib/listing-state";
 import { requestClientIp, requestCountry } from "../lib/request-metadata";
 import type { Env } from "../lib/types";
 
@@ -93,4 +94,22 @@ test("listing path parser accepts one stable listing slug", () => {
     listingIdFromPath("/opportunities/example-grant/"),
     "example-grant",
   );
+});
+
+test("Vercel tombstone lookup works without the Cloudflare Cache API", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    assert.match(url, /listing_moderation_state/);
+    return Response.json([{ listing_id: "removed-example" }]);
+  };
+
+  try {
+    assert.equal(
+      await isListingRemovedWithoutEdgeCache(baseEnv(), "removed-example"),
+      true,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
