@@ -1,9 +1,7 @@
 import { RequestError } from "./http";
+import type { GithubTargetConfig } from "./github-targets";
 import type { PublishedOpportunity } from "./publication-data";
 
-const DATA_REPOSITORY = "PerkCommons/data";
-const SITE_REPOSITORY = "PerkCommons/site";
-const DATA_BRANCH = "main";
 const GITHUB_API_VERSION = "2026-03-10";
 
 export interface GithubPullRequest {
@@ -80,29 +78,30 @@ export interface RemovalPullRequestResult {
 
 export const createPublicationPullRequest = async (
   token: string | undefined,
+  config: GithubTargetConfig,
   batchId: string,
   opportunities: PublishedOpportunity[],
 ): Promise<GithubPullRequest> => {
   const branch = publicationBranch(batchId);
   const existingPulls = await githubRequest<GithubPullRequest[]>(
     token,
-    `/repos/${DATA_REPOSITORY}/pulls?state=open&base=${DATA_BRANCH}&head=PerkCommons:${branch}`,
+    `/repos/${config.dataRepository}/pulls?state=open&base=${config.dataBranch}&head=${config.headOwner}:${branch}`,
   );
   if (existingPulls?.[0]) return existingPulls[0];
 
   const baseReference = await githubRequest<{ object: { sha: string } }>(
     token,
-    `/repos/${DATA_REPOSITORY}/git/ref/heads/${DATA_BRANCH}`,
+    `/repos/${config.dataRepository}/git/ref/heads/${config.dataBranch}`,
   );
   if (!baseReference) throw new GithubError(404, "read data branch");
   const baseCommit = await githubRequest<{ tree: { sha: string } }>(
     token,
-    `/repos/${DATA_REPOSITORY}/git/commits/${baseReference.object.sha}`,
+    `/repos/${config.dataRepository}/git/commits/${baseReference.object.sha}`,
   );
   if (!baseCommit) throw new GithubError(404, "read data commit");
   const tree = await githubRequest<{ sha: string }>(
     token,
-    `/repos/${DATA_REPOSITORY}/git/trees`,
+    `/repos/${config.dataRepository}/git/trees`,
     {
       method: "POST",
       body: JSON.stringify({
@@ -119,7 +118,7 @@ export const createPublicationPullRequest = async (
   if (!tree) throw new GithubError(500, "create data tree");
   const commit = await githubRequest<{ sha: string }>(
     token,
-    `/repos/${DATA_REPOSITORY}/git/commits`,
+    `/repos/${config.dataRepository}/git/commits`,
     {
       method: "POST",
       body: JSON.stringify({
@@ -131,7 +130,7 @@ export const createPublicationPullRequest = async (
   );
   if (!commit) throw new GithubError(500, "create data commit");
 
-  const referencePath = `/repos/${DATA_REPOSITORY}/git/refs/heads/${branch}`;
+  const referencePath = `/repos/${config.dataRepository}/git/refs/heads/${branch}`;
   const existingReference = await githubRequest<{ object: { sha: string } }>(
     token,
     referencePath,
@@ -140,7 +139,9 @@ export const createPublicationPullRequest = async (
   );
   await githubRequest(
     token,
-    existingReference ? referencePath : `/repos/${DATA_REPOSITORY}/git/refs`,
+    existingReference
+      ? referencePath
+      : `/repos/${config.dataRepository}/git/refs`,
     {
       method: existingReference ? "PATCH" : "POST",
       body: JSON.stringify(
@@ -153,13 +154,13 @@ export const createPublicationPullRequest = async (
 
   const pullRequest = await githubRequest<GithubPullRequest>(
     token,
-    `/repos/${DATA_REPOSITORY}/pulls`,
+    `/repos/${config.dataRepository}/pulls`,
     {
       method: "POST",
       body: JSON.stringify({
         title: `feat(data): publish ${opportunities.length} approved opportunities`,
         head: branch,
-        base: DATA_BRANCH,
+        base: config.dataBranch,
         body: [
           "## Automated publication batch",
           "",
@@ -171,33 +172,35 @@ export const createPublicationPullRequest = async (
       }),
     },
   );
-  if (!pullRequest) throw new GithubError(500, "create publication pull request");
+  if (!pullRequest)
+    throw new GithubError(500, "create publication pull request");
   return pullRequest;
 };
 
 export const createRemovalPullRequest = async (
   token: string | undefined,
+  config: GithubTargetConfig,
   batchId: string,
   listingId: string,
 ): Promise<RemovalPullRequestResult> => {
   const branch = removalBranch(batchId);
   const existingPulls = await githubRequest<GithubPullRequest[]>(
     token,
-    `/repos/${DATA_REPOSITORY}/pulls?state=open&base=${DATA_BRANCH}&head=PerkCommons:${branch}`,
+    `/repos/${config.dataRepository}/pulls?state=open&base=${config.dataBranch}&head=${config.headOwner}:${branch}`,
   );
   if (existingPulls?.[0])
     return { baseSha: existingPulls[0].head.sha, pullRequest: existingPulls[0] };
 
   const baseReference = await githubRequest<{ object: { sha: string } }>(
     token,
-    `/repos/${DATA_REPOSITORY}/git/ref/heads/${DATA_BRANCH}`,
+    `/repos/${config.dataRepository}/git/ref/heads/${config.dataBranch}`,
   );
   if (!baseReference) throw new GithubError(404, "read data branch");
 
   const opportunityPath = `opportunities/${listingId}.json`;
   const opportunity = await githubRequest<{ sha: string }>(
     token,
-    `/repos/${DATA_REPOSITORY}/contents/${opportunityPath}?ref=${DATA_BRANCH}`,
+    `/repos/${config.dataRepository}/contents/${opportunityPath}?ref=${config.dataBranch}`,
     undefined,
     true,
   );
@@ -206,12 +209,12 @@ export const createRemovalPullRequest = async (
 
   const baseCommit = await githubRequest<{ tree: { sha: string } }>(
     token,
-    `/repos/${DATA_REPOSITORY}/git/commits/${baseReference.object.sha}`,
+    `/repos/${config.dataRepository}/git/commits/${baseReference.object.sha}`,
   );
   if (!baseCommit) throw new GithubError(404, "read data commit");
   const tree = await githubRequest<{ sha: string }>(
     token,
-    `/repos/${DATA_REPOSITORY}/git/trees`,
+    `/repos/${config.dataRepository}/git/trees`,
     {
       method: "POST",
       body: JSON.stringify({
@@ -230,7 +233,7 @@ export const createRemovalPullRequest = async (
   if (!tree) throw new GithubError(500, "create removal tree");
   const commit = await githubRequest<{ sha: string }>(
     token,
-    `/repos/${DATA_REPOSITORY}/git/commits`,
+    `/repos/${config.dataRepository}/git/commits`,
     {
       method: "POST",
       body: JSON.stringify({
@@ -242,7 +245,7 @@ export const createRemovalPullRequest = async (
   );
   if (!commit) throw new GithubError(500, "create removal commit");
 
-  const referencePath = `/repos/${DATA_REPOSITORY}/git/refs/heads/${branch}`;
+  const referencePath = `/repos/${config.dataRepository}/git/refs/heads/${branch}`;
   const existingReference = await githubRequest<{ object: { sha: string } }>(
     token,
     referencePath,
@@ -251,7 +254,9 @@ export const createRemovalPullRequest = async (
   );
   await githubRequest(
     token,
-    existingReference ? referencePath : `/repos/${DATA_REPOSITORY}/git/refs`,
+    existingReference
+      ? referencePath
+      : `/repos/${config.dataRepository}/git/refs`,
     {
       method: existingReference ? "PATCH" : "POST",
       body: JSON.stringify(
@@ -264,13 +269,13 @@ export const createRemovalPullRequest = async (
 
   const pullRequest = await githubRequest<GithubPullRequest>(
     token,
-    `/repos/${DATA_REPOSITORY}/pulls`,
+    `/repos/${config.dataRepository}/pulls`,
     {
       method: "POST",
       body: JSON.stringify({
         title: `fix(data): remove reported opportunity ${listingId}`,
         head: branch,
-        base: DATA_BRANCH,
+        base: config.dataBranch,
         body: [
           "## Automated reported-listing removal",
           "",
@@ -288,33 +293,36 @@ export const createRemovalPullRequest = async (
 
 export const getPublicationPullRequest = (
   token: string | undefined,
+  config: GithubTargetConfig,
   number: number,
 ) =>
   githubRequest<GithubPullRequest>(
     token,
-    `/repos/${DATA_REPOSITORY}/pulls/${number}`,
+    `/repos/${config.dataRepository}/pulls/${number}`,
   );
 
 export const getPublicationChecks = async (
   token: string | undefined,
+  config: GithubTargetConfig,
   sha: string,
 ): Promise<GithubCheckRun[]> => {
   const result = await githubRequest<{ check_runs: GithubCheckRun[] }>(
     token,
-    `/repos/${DATA_REPOSITORY}/commits/${sha}/check-runs?filter=latest`,
+    `/repos/${config.dataRepository}/commits/${sha}/check-runs?filter=latest`,
   );
   return result?.check_runs ?? [];
 };
 
 export const mergePublicationPullRequest = (
   token: string | undefined,
+  config: GithubTargetConfig,
   number: number,
   sha: string,
   itemCount: number,
 ) =>
   githubRequest<{ merged: boolean; sha: string }>(
     token,
-    `/repos/${DATA_REPOSITORY}/pulls/${number}/merge`,
+    `/repos/${config.dataRepository}/pulls/${number}/merge`,
     {
       method: "PUT",
       body: JSON.stringify({
@@ -327,13 +335,14 @@ export const mergePublicationPullRequest = (
 
 export const mergeRemovalPullRequest = (
   token: string | undefined,
+  config: GithubTargetConfig,
   number: number,
   sha: string,
   listingId: string,
 ) =>
   githubRequest<{ merged: boolean; sha: string }>(
     token,
-    `/repos/${DATA_REPOSITORY}/pulls/${number}/merge`,
+    `/repos/${config.dataRepository}/pulls/${number}/merge`,
     {
       method: "PUT",
       body: JSON.stringify({
@@ -346,10 +355,11 @@ export const mergeRemovalPullRequest = (
 
 export const dispatchSiteDeployment = (
   token: string | undefined,
+  siteRepository: string,
 ) =>
   githubRequest(
     token,
-    `/repos/${SITE_REPOSITORY}/actions/workflows/deploy.yml/dispatches`,
+    `/repos/${siteRepository}/actions/workflows/deploy.yml/dispatches`,
     {
       method: "POST",
       body: JSON.stringify({ ref: "main" }),
