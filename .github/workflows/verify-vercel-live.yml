@@ -1,0 +1,42 @@
+name: Verify Vercel Next dev
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    if: github.head_ref == 'ops/verify-vercel-live'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify public Vercel deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://perkcommons-next-dev-web-cod-s-projects1.vercel.app"
+
+          echo "Checking $base"
+          curl -fSsL --retry 6 --retry-delay 10 --retry-all-errors "$base/" -o /tmp/home.html
+          grep -F "PerkCommons" /tmp/home.html
+
+          curl -fSsL --retry 3 --retry-delay 5 "$base/trust/" -o /tmp/trust.html
+          grep -F "Trust and transparency" /tmp/trust.html
+
+          curl -fSsL --retry 3 --retry-delay 5 "$base/privacy/" -o /tmp/privacy.html
+          grep -F "A plain-language privacy notice." /tmp/privacy.html
+
+          curl -fSsL --retry 3 --retry-delay 5 "$base/about/" -o /tmp/about.html
+          grep -F "operated by Cod from Poland" /tmp/about.html
+
+          curl -fSsL --retry 3 --retry-delay 5 "$base/moderator-login/" -o /tmp/moderator.html
+          grep -F "Moderator" /tmp/moderator.html
+
+          curl -fSsL --retry 3 --retry-delay 5 "$base/api/opportunities?limit=1" -o /tmp/api.json
+          grep -F '"opportunities"' /tmp/api.json
+
+          echo "VERCEL_LIVE=$base"
