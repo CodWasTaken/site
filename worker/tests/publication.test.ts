@@ -34,6 +34,11 @@ const env = {
   SUBMISSION_FINGERPRINT_SECRET: "fingerprint-secret",
   GITHUB_DATA_PUBLICATION_TOKEN: "data-publication-token",
   GITHUB_SITE_DEPLOY_TOKEN: "site-deploy-token",
+  GITHUB_DATA_REPOSITORY: "CodWasTaken/data",
+  GITHUB_DATA_BRANCH: "main",
+  GITHUB_HEAD_OWNER: "CodWasTaken",
+  GITHUB_SITE_REPOSITORY: "CodWasTaken/site",
+  FORK_ONLY_MODE: "true",
 } satisfies Env;
 
 const administrator: Moderator = {
@@ -107,6 +112,7 @@ test("starting a publication batch creates one data PR with every claimed item",
   const originalFetch = globalThis.fetch;
   let treeBody: Record<string, unknown> | undefined;
   const patches: Array<Record<string, unknown>> = [];
+  const requests: string[] = [];
   const storedBatch: Record<string, unknown> = {
     id: "33333333-3333-4333-8333-333333333333",
     status: "preparing",
@@ -124,6 +130,7 @@ test("starting a publication batch creates one data PR with every claimed item",
   globalThis.fetch = async (input, init) => {
     const url = String(input);
     const method = init?.method ?? "GET";
+    requests.push(url);
     if (url.endsWith("/rpc/begin_publication_batch"))
       return Response.json("33333333-3333-4333-8333-333333333333");
     if (url.includes("publication_batches?id=eq.") && method === "GET")
@@ -151,7 +158,7 @@ test("starting a publication batch creates one data PR with every claimed item",
       return Response.json(
         {
           number: 12,
-          html_url: "https://github.com/PerkCommons/data/pull/12",
+          html_url: "https://github.com/CodWasTaken/data/pull/12",
           state: "open",
           merged: false,
           merged_at: null,
@@ -180,6 +187,8 @@ test("starting a publication batch creates one data PR with every claimed item",
     );
     assert.equal(JSON.parse(entries[0]?.content ?? "{}").title, payload.title);
     assert.ok(patches.some((patch) => patch.status === "validating"));
+    assert.ok(requests.some((url) => url.includes("/repos/CodWasTaken/data/")));
+    assert.equal(requests.some((url) => url.includes("/repos/PerkCommons/")), false);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -201,7 +210,7 @@ test("an active publication batch is returned without rewriting its data branch"
           item_count: 2,
           github_branch: "publication-33333333-3333-4333-8333-333333333333",
           github_pr_number: 12,
-          github_pr_url: "https://github.com/PerkCommons/data/pull/12",
+          github_pr_url: "https://github.com/CodWasTaken/data/pull/12",
           github_head_sha: "new-commit",
           github_merge_sha: null,
           last_error_code: null,
@@ -225,11 +234,13 @@ test("an active publication batch is returned without rewriting its data branch"
 test("reconciliation merges only after validation and then requests deployment", async () => {
   const originalFetch = globalThis.fetch;
   const rpcCalls: string[] = [];
+  const requests: string[] = [];
   let mergeCalled = false;
   let deploymentCalled = false;
   globalThis.fetch = async (input, init) => {
     const url = String(input);
     const method = init?.method ?? "GET";
+    requests.push(url);
     if (url.includes("status=in.(validating,merging)"))
       return Response.json([
         {
@@ -238,7 +249,7 @@ test("reconciliation merges only after validation and then requests deployment",
           item_count: 1,
           github_branch: "publication-33333333-3333-4333-8333-333333333333",
           github_pr_number: 12,
-          github_pr_url: "https://github.com/PerkCommons/data/pull/12",
+          github_pr_url: "https://github.com/CodWasTaken/data/pull/12",
           github_head_sha: "new-commit",
           github_merge_sha: null,
           last_error_code: null,
@@ -250,7 +261,7 @@ test("reconciliation merges only after validation and then requests deployment",
     if (url.endsWith("/pulls/12") && method === "GET")
       return Response.json({
         number: 12,
-        html_url: "https://github.com/PerkCommons/data/pull/12",
+        html_url: "https://github.com/CodWasTaken/data/pull/12",
         state: "open",
         merged: false,
         merged_at: null,
@@ -286,6 +297,8 @@ test("reconciliation merges only after validation and then requests deployment",
     assert.equal(deploymentCalled, true);
     assert.equal(rpcCalls.length, 1);
     assert.match(rpcCalls[0] ?? "", /merge-sha/);
+    assert.ok(requests.some((url) => url.includes("/repos/CodWasTaken/data/")));
+    assert.equal(requests.some((url) => url.includes("/repos/PerkCommons/")), false);
   } finally {
     globalThis.fetch = originalFetch;
   }
