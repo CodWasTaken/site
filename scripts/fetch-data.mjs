@@ -5,10 +5,29 @@ import { spawn } from "node:child_process";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const destination = resolve(repositoryRoot, ".data");
+const isVercel = process.env.VERCEL === "1";
+const configuredRepository = process.env.PERKCOMMONS_DATA_REPOSITORY?.trim();
+const configuredRef = process.env.PERKCOMMONS_DATA_REF?.trim();
+
+if (isVercel && (!configuredRepository || !configuredRef)) {
+  throw new Error(
+    "Vercel builds require PERKCOMMONS_DATA_REPOSITORY and PERKCOMMONS_DATA_REF",
+  );
+}
+
+if (
+  isVercel &&
+  (configuredRepository !== "https://github.com/CodWasTaken/data.git" ||
+    configuredRef !== "main")
+) {
+  throw new Error(
+    "Vercel Next-development builds are restricted to CodWasTaken/data main",
+  );
+}
+
 const dataRepository =
-  process.env.PERKCOMMONS_DATA_REPOSITORY?.trim() ||
-  "https://github.com/PerkCommons/data.git";
-const dataRef = process.env.PERKCOMMONS_DATA_REF?.trim();
+  configuredRepository || "https://github.com/PerkCommons/data.git";
+const dataRef = configuredRef;
 
 await rm(destination, { recursive: true, force: true });
 
@@ -39,7 +58,9 @@ try {
         return;
       }
 
-      const reason = signal ? `signal ${signal}` : `exit code ${code ?? "unknown"}`;
+      const reason = signal
+        ? `signal ${signal}`
+        : `exit code ${code ?? "unknown"}`;
       rejectClone(new Error(`git clone ended with ${reason}`));
     });
   });
