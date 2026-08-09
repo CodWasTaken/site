@@ -4,14 +4,12 @@ on:
   push:
     branches: [main]
 permissions:
-  contents: write
+  contents: read
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
       - uses: actions/checkout@v4
         with:
           repository: CodWasTaken/data
@@ -21,56 +19,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Generate Vercel functions dependency lock
-        run: npm install @vercel/functions@^3.9.1 --save
-      - name: Commit generated package files when needed
-        shell: bash
-        run: |
-          if git diff --quiet -- package.json package-lock.json; then
-            echo "Vercel dependency lock is already current."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json
-          git commit -m "build(vercel): add functions runtime dependency"
-          git push origin HEAD:${{ github.head_ref || github.ref_name }}
       - run: npm test
       - run: npm run build
         env:
           PERKCOMMONS_DATA_PATH: ${{ github.workspace }}/.data/opportunities
-      - name: Diagnose public browser configuration
-        shell: bash
-        run: |
-          if grep -R -Fq "kglyikactodqfxoimgyw.supabase.co" dist; then
-            echo "present" | tee public-config-status.txt
-            echo "Public Supabase hostname is present in the built browser bundle."
-          else
-            echo "missing" | tee public-config-status.txt
-            echo "Public Supabase hostname is MISSING from the built browser bundle."
-          fi
       - run: npx playwright install --with-deps chromium
-      - name: Run browser tests with diagnostics
-        shell: bash
-        run: |
-          set -o pipefail
-          npm run test:browser 2>&1 | tee playwright-output.txt
-          status=${PIPESTATUS[0]}
-          {
-            echo '## Playwright diagnostic tail'
-            echo '```text'
-            tail -n 200 playwright-output.txt
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          exit "$status"
+      - run: npm run test:browser
         env:
           PERKCOMMONS_DATA_PATH: ${{ github.workspace }}/.data/opportunities
-      - name: Upload Playwright diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-diagnostics
-          path: |
-            playwright-output.txt
-            public-config-status.txt
-          if-no-files-found: warn
