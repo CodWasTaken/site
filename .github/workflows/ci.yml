@@ -4,12 +4,14 @@ on:
   push:
     branches: [main]
 permissions:
-  contents: read
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
       - uses: actions/checkout@v4
         with:
           repository: CodWasTaken/data
@@ -20,14 +22,19 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Generate Vercel functions dependency lock
-        run: npm install @vercel/functions --save
-      - name: Upload generated package files
-        uses: actions/upload-artifact@v4
-        with:
-          name: vercel-package-files
-          path: |
-            package.json
-            package-lock.json
+        run: npm install @vercel/functions@^3.9.1 --save
+      - name: Commit generated package files when needed
+        shell: bash
+        run: |
+          if git diff --quiet -- package.json package-lock.json; then
+            echo "Vercel dependency lock is already current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "build(vercel): add functions runtime dependency"
+          git push origin HEAD:${{ github.head_ref || github.ref_name }}
       - run: npm test
       - run: npm run build
         env:
