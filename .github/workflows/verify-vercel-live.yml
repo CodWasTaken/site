@@ -14,17 +14,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Diagnose pinned Vercel deployment
+      - name: Diagnose root-copy Vercel deployment
         shell: bash
         run: |
           set -euo pipefail
-          base="https://perkcommons-next-dev-final-qqr6z11cc-cod-s-projects1.vercel.app"
+          base="https://perkcommons-next-dev-final-fvz266rh6-cod-s-projects1.vercel.app"
           code=$(curl -sS -L -D /tmp/headers -o /tmp/home.html -w '%{http_code}' "$base/")
           echo "HTTP_STATUS=$code"
-          echo "--- headers ---"
           grep -Ei '^(HTTP/|content-type:|location:|server:|x-vercel-|cache-control:)' /tmp/headers || true
           echo "--- body start ---"
-          head -c 1800 /tmp/home.html | tr '\n' ' '
+          head -c 1600 /tmp/home.html | tr '\n' ' '
           echo
           test "$code" = "200"
           grep -F "Open data. Evidence-led review." /tmp/home.html
+          grep -F "Default opportunities" /tmp/home.html
+          grep -F "779" /tmp/home.html
