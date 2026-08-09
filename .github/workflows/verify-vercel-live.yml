@@ -14,11 +14,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - name: Verify final Next Vercel deployment
+      - name: Verify pinned Next Vercel deployment
         shell: bash
         run: |
           set -euo pipefail
-          base="https://perkcommons-next-dev-final-cod-s-projects1.vercel.app"
+          base="https://perkcommons-next-dev-final-qqr6z11cc-cod-s-projects1.vercel.app"
+          canonical="https://perkcommons-next-dev-final-cod-s-projects1.vercel.app"
           expected_data_sha="db80383717ded0e29af497d36894c52bde8a01fa"
 
           echo "Checking $base"
@@ -29,7 +30,7 @@ jobs:
           grep -F "Ordinary free products and generic memberships are kept outside default results." /tmp/home.html
           grep -F "Default opportunities" /tmp/home.html
           grep -F "779" /tmp/home.html
-          grep -F 'rel="canonical" href="https://perkcommons-next-dev-final-cod-s-projects1.vercel.app/' /tmp/home.html
+          grep -F "rel=\"canonical\" href=\"$canonical/\"" /tmp/home.html
 
           code=$(curl -sS -L --retry 5 --retry-delay 5 -o /tmp/catalog.json -w '%{http_code}' "$base/catalog-index.json")
           echo "catalog HTTP_STATUS=$code"
@@ -43,19 +44,13 @@ jobs:
           test "$(jq '[.facets.category[]] | add' /tmp/facets.json)" = "779"
           test "$(jq -r '.metadata.dataCommitSha' /tmp/facets.json)" = "$expected_data_sha"
 
-          code=$(curl -sS -L --retry 5 --retry-delay 5 -o /tmp/trust.html -w '%{http_code}' "$base/trust/")
-          echo "trust HTTP_STATUS=$code"
-          test "$code" = "200"
+          for path in trust privacy about; do
+            code=$(curl -sS -L --retry 5 --retry-delay 5 -o "/tmp/$path.html" -w '%{http_code}' "$base/$path/")
+            echo "$path HTTP_STATUS=$code"
+            test "$code" = "200"
+          done
           grep -F "Trust and transparency" /tmp/trust.html
-
-          code=$(curl -sS -L --retry 5 --retry-delay 5 -o /tmp/privacy.html -w '%{http_code}' "$base/privacy/")
-          echo "privacy HTTP_STATUS=$code"
-          test "$code" = "200"
           grep -F "A plain-language privacy notice." /tmp/privacy.html
-
-          code=$(curl -sS -L --retry 5 --retry-delay 5 -o /tmp/about.html -w '%{http_code}' "$base/about/")
-          echo "about HTTP_STATUS=$code"
-          test "$code" = "200"
           grep -F "This is the PerkCommons Next experimental fork." /tmp/about.html
 
           code=$(curl -sS -L --retry 5 --retry-delay 5 -o /tmp/api.json -w '%{http_code}' "$base/api/v1/opportunities?limit=1")
@@ -63,4 +58,4 @@ jobs:
           test "$code" = "200"
           test "$(jq '.records | length' /tmp/api.json)" = "1"
 
-          echo "VERCEL_NEXT_FOUNDATION_VERIFIED=$base"
+          echo "VERCEL_PINNED_NEXT_VERIFIED=$base"
