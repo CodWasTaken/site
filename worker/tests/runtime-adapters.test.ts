@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { listingIdFromPath } from "../../middleware";
+import { createNoopEdgeCache } from "../../vercel/runtime-compat";
 import { vercelEnv } from "../../vercel/runtime-env";
 import { routeApiRequest } from "../lib/api-router";
 import { isListingRemovedWithoutEdgeCache } from "../lib/listing-state";
@@ -112,4 +113,13 @@ test("Vercel tombstone lookup works without the Cloudflare Cache API", async () 
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("Vercel cache compatibility is deliberately non-persistent", async () => {
+  const cache = createNoopEdgeCache();
+  const request = new Request("https://next.example/__listing-state-cache/test");
+  assert.equal(await cache.match(request), undefined);
+  await cache.put(request, new Response("removed"));
+  assert.equal(await cache.match(request), undefined);
+  assert.equal(await cache.delete(request), false);
 });
