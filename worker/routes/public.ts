@@ -1,17 +1,10 @@
-import {
-  keyedFingerprint,
-  normalizeIpAddress,
-  normalizeUserAgent,
-} from "../lib/fingerprints";
+import { keyedFingerprint, normalizeUserAgent } from "../lib/fingerprints";
 import { apiError, json, readJson, RequestError } from "../lib/http";
 import { strongestBanMode } from "../lib/moderation-policy";
+import { requestClientIp, requestCountry } from "../lib/request-metadata";
 import { insertRows, supabaseRequest } from "../lib/supabase";
 import type { Env } from "../lib/types";
-import {
-  normalizeCountryCode,
-  validateReport,
-  validateSubmission,
-} from "../lib/validation";
+import { validateReport, validateSubmission } from "../lib/validation";
 
 const genericSuccess = () => json({ message: "Submitted for review." }, 201);
 
@@ -104,10 +97,8 @@ const requestSignals = async (
   env: Env,
   email: string | null,
 ) => {
-  const rawIp = normalizeIpAddress(
-    request.headers.get("CF-Connecting-IP") ?? "",
-  );
-  const country = normalizeCountryCode(request.cf?.country);
+  const rawIp = requestClientIp(request);
+  const country = requestCountry(request);
   const emailHash = await keyedFingerprint(
     env.SUBMISSION_FINGERPRINT_SECRET,
     "email",
@@ -163,8 +154,6 @@ export async function handlePublicSubmission(
       subcategories: input.subcategories,
       tags: input.tags,
       source_url: input.source_url,
-      // Keep the legacy required column populated while existing deployments
-      // transition to organization_website_url.
       website_url: input.organization_website_url ?? input.source_url,
       organization_website_url: input.organization_website_url,
       description: input.description,
