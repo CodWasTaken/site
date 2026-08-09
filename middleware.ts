@@ -1,5 +1,5 @@
 import { requireModerator } from "./worker/lib/auth";
-import { isListingRemoved } from "./worker/routes/moderation";
+import { isListingRemovedWithoutEdgeCache } from "./worker/lib/listing-state";
 import { vercelEnv } from "./vercel/runtime-env";
 
 export const listingIdFromPath = (pathname: string): string | null => {
@@ -45,7 +45,7 @@ export default async function middleware(request: Request): Promise<Response> {
   if (
     request.method === "GET" &&
     listingId &&
-    (await isListingRemoved(env, listingId))
+    (await isListingRemovedWithoutEdgeCache(env, listingId))
   )
     return removedListingResponse();
 
