@@ -27,20 +27,27 @@ export function vercelEnv(
       source,
       "SUBMISSION_FINGERPRINT_SECRET",
     ),
-    TURNSTILE_SECRET_KEY: optional(source, "TURNSTILE_SECRET_KEY"),
-    GITHUB_DATA_PUBLICATION_TOKEN: optional(
-      source,
-      "GITHUB_DATA_PUBLICATION_TOKEN",
-    ),
     GITHUB_DATA_REPOSITORY:
       optional(source, "GITHUB_DATA_REPOSITORY") ?? "CodWasTaken/data",
     GITHUB_DATA_BRANCH: optional(source, "GITHUB_DATA_BRANCH") ?? "main",
     GITHUB_HEAD_OWNER: optional(source, "GITHUB_HEAD_OWNER") ?? "CodWasTaken",
-    GITHUB_SITE_REPOSITORY: optional(source, "GITHUB_SITE_REPOSITORY"),
     FORK_ONLY_MODE: "true",
-    VERCEL_DEPLOY_HOOK_URL: optional(source, "VERCEL_DEPLOY_HOOK_URL"),
-    CRON_SECRET: optional(source, "CRON_SECRET"),
   };
+
+  const turnstileSecret = optional(source, "TURNSTILE_SECRET_KEY");
+  if (turnstileSecret) env.TURNSTILE_SECRET_KEY = turnstileSecret;
+
+  const publicationToken = optional(source, "GITHUB_DATA_PUBLICATION_TOKEN");
+  if (publicationToken) env.GITHUB_DATA_PUBLICATION_TOKEN = publicationToken;
+
+  const siteRepository = optional(source, "GITHUB_SITE_REPOSITORY");
+  if (siteRepository) env.GITHUB_SITE_REPOSITORY = siteRepository;
+
+  const deployHook = optional(source, "VERCEL_DEPLOY_HOOK_URL");
+  if (deployHook) env.VERCEL_DEPLOY_HOOK_URL = deployHook;
+
+  const cronSecret = optional(source, "CRON_SECRET");
+  if (cronSecret) env.CRON_SECRET = cronSecret;
 
   githubTargetConfig(env);
   return env;
