@@ -2,26 +2,26 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Move the PerkCommons Next-development runtime to a production `*.vercel.app` deployment sourced from `CodWasTaken/site` `main`, while preserving the static-first catalogue, dynamic API/moderation behavior, publication/removal reconciliation, and the existing Cloudflare Next-development Worker as rollback.
+**Goal:** Move the PerkCommons Next-development runtime to a production `*.vercel.app` deployment sourced from `CodWasTaken/site` `main`, preserving the static-first catalogue, dynamic submission/moderation/report behavior, publication/removal reconciliation, and the existing Cloudflare Next-development Worker as rollback.
 
-**Architecture:** Keep Astro output static and extract the current Cloudflare Worker request router into runtime-neutral modules. Add thin Vercel adapters for API requests, routing middleware for listing tombstones/moderator protection, a protected Vercel Cron reconciliation endpoint, and a Vercel Deploy Hook transport for publication-triggered rebuilds. Reuse the isolated Next-development Supabase project and hard-fail any Vercel Next-development path that would target the original `PerkCommons/*` repositories.
+**Architecture:** Keep Astro static. Extract the current Worker API dispatcher into runtime-neutral modules, then add thin Vercel Node Function and Routing Middleware adapters. Replace Worker cron execution with a protected Vercel Cron endpoint and replace Next-dev site rebuild dispatch with a Vercel Deploy Hook. Reuse the isolated Next-dev Supabase project and fail closed if Vercel publication/removal code attempts to target the original `PerkCommons/*` repositories.
 
-**Tech Stack:** Astro 7, TypeScript 6, Vercel Node.js Functions, Vercel Routing Middleware via `@vercel/functions`, Vercel Cron Jobs, Supabase REST/Auth, GitHub REST API, Pagefind, Node test runner.
+**Tech Stack:** Astro 7, TypeScript 6, Vercel Node.js Functions, `@vercel/node`, Vercel Routing Middleware via `@vercel/functions`, Vercel Cron, Supabase REST/Auth, GitHub REST API, Pagefind, Node test runner.
 
 ## Global Constraints
 
 - Modify only `CodWasTaken/site` and isolated Next-development infrastructure.
-- Do not modify `PerkCommons/*`, `perkcommons.com`, the production Cloudflare Worker, or the existing `perkcommons-next-fork-dev.cod3eater.workers.dev` deployment.
+- Never modify or deploy `PerkCommons/*`, `perkcommons.com`, the production Cloudflare Worker, or the existing `perkcommons-next-fork-dev.cod3eater.workers.dev` Worker.
 - Vercel project name: `perkcommons-next-dev`.
-- Production branch: `main`.
-- Initial public hostname: generated `*.vercel.app` only; attach no custom domain.
-- Vercel builds must read `https://github.com/CodWasTaken/data.git` at ref `main` and must not silently fall back to `PerkCommons/data`.
+- Vercel production branch: `main`.
+- Initial public hostname: generated `*.vercel.app` only; no custom domain.
+- Vercel builds must use `https://github.com/CodWasTaken/data.git` at ref `main`; no silent fallback to `PerkCommons/data` on Vercel.
 - Reuse the existing isolated Next-development Supabase project.
-- Keep raw client IP transient; persist only the existing keyed fingerprints and normalized country code.
-- Preserve existing moderator session semantics, Turnstile verification, publication validation, listing removal behavior, and static-first public pages.
-- Vercel Cron must call publication reconciliation before listing-removal reconciliation.
-- The Cloudflare Worker entry point remains buildable as rollback-compatible source code.
-- No secret value is committed to Git. Public browser values may remain public; `SUPABASE_SERVICE_ROLE_KEY`, `SUBMISSION_FINGERPRINT_SECRET`, GitHub write tokens, `CRON_SECRET`, and the Vercel deploy-hook URL are server-only.
+- Keep raw client IP transient; persist only existing keyed fingerprints and normalized country code.
+- Preserve moderator sessions, Turnstile verification, publication validation, tombstone suppression, and static-first pages.
+- Vercel reconciliation order: publication batches first, listing removals second.
+- Keep the Cloudflare Worker source buildable; its already-deployed Next-dev version is rollback and must not be changed during this migration.
+- Never commit `SUPABASE_SERVICE_ROLE_KEY`, `SUBMISSION_FINGERPRINT_SECRET`, `GITHUB_DATA_PUBLICATION_TOKEN`, `CRON_SECRET`, `TURNSTILE_SECRET_KEY`, or `VERCEL_DEPLOY_HOOK_URL` values.
 
 ---
 
@@ -29,37 +29,39 @@
 
 ### New files
 
-- `worker/lib/api-router.ts` — runtime-neutral `/api/*` dispatcher extracted from `worker/index.ts`.
-- `worker/lib/request-metadata.ts` — runtime-neutral client IP/country extraction from trusted Cloudflare or Vercel headers.
-- `worker/lib/deployment.ts` — site rebuild transport abstraction; Vercel Deploy Hook first, legacy GitHub workflow dispatch only when explicitly configured.
-- `vercel/runtime-env.ts` — validates and constructs the shared `Env` object from Vercel `process.env`.
-- `api/[...path].ts` — catch-all Vercel Node.js Function adapter for the shared API router.
-- `api/cron/reconcile.ts` — protected reconciliation endpoint called by Vercel Cron.
-- `middleware.ts` — Vercel Routing Middleware for tombstones and moderator route protection.
-- `vercel.json` — cron schedule, function duration, framework/build settings, and platform security headers.
-- `worker/tests/runtime-adapters.test.ts` — request metadata, shared router, and Vercel environment tests.
-- `worker/tests/vercel-cron.test.ts` — cron authorization/order tests.
-- `worker/tests/deployment.test.ts` — deploy-hook and fork-only deployment tests.
+- `worker/lib/api-router.ts` — runtime-neutral `/api/*` route dispatcher extracted from `worker/index.ts`.
+- `worker/lib/request-metadata.ts` — client IP/country extraction supporting both Cloudflare and Vercel headers.
+- `worker/lib/github-targets.ts` — GitHub repository configuration and fork-only refusal guard; intentionally independent of deployment transport.
+- `worker/lib/deployment.ts` — rebuild transport abstraction; Vercel Deploy Hook first, legacy GitHub workflow dispatch only when explicitly configured.
+- `vercel/runtime-env.ts` — strict construction of shared `Env` from Vercel environment variables.
+- `api/[...path].ts` — catch-all Vercel Node Function adapter for shared API routing.
+- `api/cron/reconcile.ts` — protected Vercel Cron reconciliation endpoint.
+- `middleware.ts` — Vercel Routing Middleware for listing tombstones and moderator route protection.
+- `vercel.json` — Vercel build/function/headers/cron configuration.
+- `worker/tests/runtime-adapters.test.ts` — shared router, request metadata, environment adapter, middleware utility tests.
+- `worker/tests/deployment.test.ts` — fork-target and deploy-hook tests.
+- `worker/tests/vercel-cron.test.ts` — cron authorization and ordering tests.
 
 ### Existing files to modify
 
-- `worker/index.ts` — reduce to Cloudflare adapter + static asset fallback + scheduled adapter.
-- `worker/lib/types.ts` — remove shared reliance on mandatory `ASSETS`; add explicit fork/deployment configuration fields.
-- `worker/routes/public.ts` — use `request-metadata.ts` instead of `request.cf`/Cloudflare-only IP extraction.
-- `worker/lib/publication-github.ts` — replace hard-coded `PerkCommons/data`, `PerkCommons/site`, and `PerkCommons` head owner with validated configuration.
-- `worker/lib/publication.ts` — use deployment abstraction and deployment-capability check.
-- `worker/lib/removal.ts` — use deployment abstraction and deployment-capability check.
-- `worker/tests/public-api.test.ts` — retain public API behavior and add Vercel-header coverage where appropriate.
-- `worker/tests/publication.test.ts` — assert `CodWasTaken/data` targeting and Vercel deploy-hook behavior.
-- `worker/tests/removal.test.ts` — assert fork-only removal and deploy-hook behavior.
-- `scripts/fetch-data.mjs` — fail closed on Vercel when fork data repository/ref are absent.
-- `astro.config.ts` — derive the generated site URL from the Vercel production URL during Vercel builds while keeping the existing production fallback outside Vercel.
-- `package.json` / `package-lock.json` — add Vercel runtime dependencies and test/type-check coverage.
-- `.env.example` — document Vercel-only variable names with empty values, never secrets.
+- `worker/index.ts`
+- `worker/lib/types.ts`
+- `worker/routes/public.ts`
+- `worker/lib/publication-github.ts`
+- `worker/lib/publication.ts`
+- `worker/lib/removal.ts`
+- `worker/tests/public-api.test.ts`
+- `worker/tests/publication.test.ts`
+- `worker/tests/removal.test.ts`
+- `scripts/fetch-data.mjs`
+- `astro.config.ts`
+- `package.json`
+- `package-lock.json`
+- `.env.example`
 
 ---
 
-### Task 1: Extract a Runtime-Neutral API Router
+### Task 1: Extract the Shared API Router
 
 **Files:**
 - Create: `worker/lib/api-router.ts`
@@ -69,12 +71,9 @@
 
 **Interfaces:**
 - Produces: `routeApiRequest(request: Request, env: Env): Promise<Response>`.
-- Produces: `Env` where `ASSETS` is optional and runtime-only configuration fields are explicit strings.
-- Consumes: all existing moderation/public route functions without changing their public signatures.
+- Produces: shared `Env` with optional runtime-specific bindings.
 
-- [ ] **Step 1: Write the failing shared-router test**
-
-Create `worker/tests/runtime-adapters.test.ts` with a minimal environment helper and assert an unknown API route returns the existing JSON 404 contract:
+- [ ] **Step 1: Write the failing router test**
 
 ```ts
 import assert from "node:assert/strict";
@@ -82,7 +81,7 @@ import test from "node:test";
 import { routeApiRequest } from "../lib/api-router";
 import type { Env } from "../lib/types";
 
-const env = (): Env => ({
+const baseEnv = (): Env => ({
   SUPABASE_URL: "https://example.supabase.co",
   SUPABASE_PUBLISHABLE_KEY: "public",
   SUPABASE_SERVICE_ROLE_KEY: "service",
@@ -93,10 +92,10 @@ const env = (): Env => ({
   FORK_ONLY_MODE: "true",
 });
 
-test("shared API router preserves the not-found contract", async () => {
+test("shared API router preserves unknown-route JSON contract", async () => {
   const response = await routeApiRequest(
     new Request("https://next.example/api/does-not-exist"),
-    env(),
+    baseEnv(),
   );
   assert.equal(response.status, 404);
   assert.deepEqual(await response.json(), {
@@ -105,30 +104,31 @@ test("shared API router preserves the not-found contract", async () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused test and confirm it fails because the module is absent**
-
-Run:
+- [ ] **Step 2: Run the focused test**
 
 ```bash
 npx tsx --test worker/tests/runtime-adapters.test.ts
 ```
 
-Expected: FAIL with module resolution error for `../lib/api-router`.
+Expected: FAIL because `worker/lib/api-router.ts` does not exist.
 
-- [ ] **Step 3: Move only the `/api/*` dispatch logic out of `worker/index.ts`**
+- [ ] **Step 3: Extract the existing route dispatcher**
 
-Create `worker/lib/api-router.ts` containing the route regexes and the current `api()` body, exported as:
+Move the API regexes and current `api()` function from `worker/index.ts` into `worker/lib/api-router.ts`. Export:
 
 ```ts
 export async function routeApiRequest(
   request: Request,
   env: Env,
 ): Promise<Response> {
-  // Existing route dispatch copied without behavior changes.
+  // Copy the current dispatch branches exactly: submissions, reports,
+  // listing state, auth/session, moderation queue/reports/moderators/bans,
+  // rejected purge, publications, feature, submission detail/actions,
+  // ban removal, report resolution, and the existing JSON 404/error mapping.
 }
 ```
 
-Keep `worker/index.ts` responsible for Cloudflare-only concerns:
+`worker/index.ts` becomes an adapter:
 
 ```ts
 if (url.pathname.startsWith("/api/")) {
@@ -136,40 +136,28 @@ if (url.pathname.startsWith("/api/")) {
 }
 ```
 
-Change the `Env` shape so `ASSETS` is optional to shared code:
+Change `Env.ASSETS` to optional because it is Cloudflare-only:
 
 ```ts
-export interface Env {
-  ASSETS?: { fetch(request: Request): Promise<Response> };
-  SUPABASE_URL: string;
-  SUPABASE_PUBLISHABLE_KEY: string;
-  SUPABASE_SERVICE_ROLE_KEY: string;
-  SUBMISSION_FINGERPRINT_SECRET: string;
-  GITHUB_DATA_PUBLICATION_TOKEN?: string;
-  GITHUB_SITE_DEPLOY_TOKEN?: string;
-  GITHUB_DATA_REPOSITORY?: string;
-  GITHUB_DATA_BRANCH?: string;
-  GITHUB_HEAD_OWNER?: string;
-  FORK_ONLY_MODE?: string;
-  VERCEL_DEPLOY_HOOK_URL?: string;
-  TURNSTILE_SECRET_KEY?: string;
-  SUBMISSION_RATE_LIMITER?: {
-    limit(options: { key: string }): Promise<{ success: boolean }>;
-  };
-}
+ASSETS?: { fetch(request: Request): Promise<Response> };
 ```
 
-Before `env.ASSETS.fetch()` in the Cloudflare adapter, fail explicitly when the binding is absent rather than using a non-null assertion.
+Before serving assets in `worker/index.ts`:
 
-- [ ] **Step 4: Run router and full Worker tests**
+```ts
+if (!env.ASSETS) {
+  return new Response("Static asset binding is unavailable.", { status: 503 });
+}
+return env.ASSETS.fetch(request);
+```
 
-Run:
+- [ ] **Step 4: Run router and Worker tests**
 
 ```bash
 npx tsx --test worker/tests/runtime-adapters.test.ts worker/tests/*.test.ts
 ```
 
-Expected: PASS, with existing Worker behavior unchanged.
+Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
@@ -180,7 +168,7 @@ git commit -m "refactor(runtime): extract shared API router"
 
 ---
 
-### Task 2: Make Request Metadata Portable to Vercel
+### Task 2: Make Request Metadata Runtime-Neutral
 
 **Files:**
 - Create: `worker/lib/request-metadata.ts`
@@ -191,16 +179,13 @@ git commit -m "refactor(runtime): extract shared API router"
 **Interfaces:**
 - Produces: `requestClientIp(request: Request): string | null`.
 - Produces: `requestCountry(request: Request): string | null`.
-- Consumes: existing `normalizeIpAddress()` and `normalizeCountryCode()`.
 
-- [ ] **Step 1: Add failing tests for Vercel and Cloudflare request metadata**
-
-Add:
+- [ ] **Step 1: Add failing header tests**
 
 ```ts
 import { requestClientIp, requestCountry } from "../lib/request-metadata";
 
-test("Vercel request metadata uses trusted forwarded IP and country headers", () => {
+test("Vercel headers provide client metadata", () => {
   const request = new Request("https://next.example/api/submissions", {
     headers: {
       "x-forwarded-for": "203.0.113.40",
@@ -211,7 +196,7 @@ test("Vercel request metadata uses trusted forwarded IP and country headers", ()
   assert.equal(requestCountry(request), "PL");
 });
 
-test("Cloudflare request metadata remains supported for rollback code", () => {
+test("Cloudflare headers remain supported", () => {
   const request = new Request("https://next.example/api/submissions", {
     headers: {
       "cf-connecting-ip": "198.51.100.4",
@@ -223,19 +208,13 @@ test("Cloudflare request metadata remains supported for rollback code", () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests and confirm missing-module failure**
-
-Run:
+- [ ] **Step 2: Run and confirm missing-module failure**
 
 ```bash
 npx tsx --test worker/tests/runtime-adapters.test.ts
 ```
 
-Expected: FAIL until `request-metadata.ts` exists.
-
-- [ ] **Step 3: Implement header-based metadata extraction**
-
-Create:
+- [ ] **Step 3: Implement portable metadata extraction**
 
 ```ts
 import { normalizeIpAddress } from "./fingerprints";
@@ -256,17 +235,15 @@ export const requestCountry = (request: Request): string | null =>
   );
 ```
 
-Update `worker/routes/public.ts` so `requestSignals()` uses only these helpers. Remove `request.cf?.country` entirely from application logic.
+Update `worker/routes/public.ts` `requestSignals()` to use these helpers. Remove application dependence on `request.cf?.country`.
 
-- [ ] **Step 4: Run public API and runtime tests**
-
-Run:
+- [ ] **Step 4: Run public API tests**
 
 ```bash
 npx tsx --test worker/tests/runtime-adapters.test.ts worker/tests/public-api.test.ts
 ```
 
-Expected: PASS, including existing fingerprint/rate-limit behavior.
+Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
@@ -277,40 +254,34 @@ git commit -m "refactor(runtime): support Vercel request metadata"
 
 ---
 
-### Task 3: Enforce Fork-Only GitHub Publication and Vercel Rebuild Dispatch
+### Task 3: Make GitHub Publication Explicitly Fork-Only
 
 **Files:**
-- Create: `worker/lib/deployment.ts`
+- Create: `worker/lib/github-targets.ts`
 - Modify: `worker/lib/publication-github.ts`
-- Modify: `worker/lib/publication.ts`
-- Modify: `worker/lib/removal.ts`
 - Modify: `worker/lib/types.ts`
+- Modify: `worker/tests/publication.test.ts`
+- Modify: `worker/tests/removal.test.ts`
 - Test: `worker/tests/deployment.test.ts`
-- Test: `worker/tests/publication.test.ts`
-- Test: `worker/tests/removal.test.ts`
 
 **Interfaces:**
-- Produces: `githubPublicationConfig(env: Env): { dataRepository: string; dataBranch: string; headOwner: string }`.
+- Produces: `GithubTargetConfig`.
+- Produces: `githubTargetConfig(env: Env): GithubTargetConfig`.
 - Produces: `assertForkOnlyRepository(repository: string, forkOnlyMode: string | undefined): void`.
-- Produces: `siteDeploymentConfigured(env: Env): boolean`.
-- Produces: `requestSiteDeployment(env: Env): Promise<void>`.
-- Changes GitHub helpers to consume repository configuration rather than module-level hard-coded repository constants.
+- `publication-github.ts` functions consume `GithubTargetConfig` instead of module-level repository constants.
 
-- [ ] **Step 1: Write failing fork-safety and deploy-hook tests**
-
-Create `worker/tests/deployment.test.ts`:
+- [ ] **Step 1: Write failing fork guard tests**
 
 ```ts
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
   assertForkOnlyRepository,
-  requestSiteDeployment,
-  siteDeploymentConfigured,
-} from "../lib/deployment";
+  githubTargetConfig,
+} from "../lib/github-targets";
 import type { Env } from "../lib/types";
 
-test("fork-only mode refuses original repositories", () => {
+test("fork-only mode refuses original organization repositories", () => {
   assert.throws(
     () => assertForkOnlyRepository("PerkCommons/data", "true"),
     /fork-only/i,
@@ -320,102 +291,89 @@ test("fork-only mode refuses original repositories", () => {
   );
 });
 
-test("Vercel deploy hook satisfies site deployment capability", () => {
-  const env = { VERCEL_DEPLOY_HOOK_URL: "https://api.vercel.com/v1/integrations/deploy/test" } as Env;
-  assert.equal(siteDeploymentConfigured(env), true);
+test("fork target config resolves the CodWasTaken data repository", () => {
+  const config = githubTargetConfig({
+    GITHUB_DATA_REPOSITORY: "CodWasTaken/data",
+    GITHUB_DATA_BRANCH: "main",
+    GITHUB_HEAD_OWNER: "CodWasTaken",
+    FORK_ONLY_MODE: "true",
+  } as Env);
+  assert.deepEqual(config, {
+    dataRepository: "CodWasTaken/data",
+    dataBranch: "main",
+    headOwner: "CodWasTaken",
+  });
 });
 ```
 
-Add an HTTP mock test that captures a POST to `VERCEL_DEPLOY_HOOK_URL` and asserts no authorization secret is logged or returned.
-
-- [ ] **Step 2: Run focused tests and confirm failure**
+- [ ] **Step 2: Run and confirm missing-module failure**
 
 ```bash
 npx tsx --test worker/tests/deployment.test.ts
 ```
 
-Expected: FAIL because `worker/lib/deployment.ts` does not exist.
-
-- [ ] **Step 3: Implement validated fork configuration**
-
-In `worker/lib/publication-github.ts`, replace module constants with values passed from a configuration object. Defaults are permitted only when `FORK_ONLY_MODE` is not enabled. In fork-only mode, any repository whose owner is `PerkCommons` must throw before an HTTP request is issued.
-
-Use this configuration shape:
+- [ ] **Step 3: Implement the independent target module**
 
 ```ts
-export interface GithubPublicationConfig {
+import { RequestError } from "./http";
+import type { Env } from "./types";
+
+export interface GithubTargetConfig {
   dataRepository: string;
   dataBranch: string;
   headOwner: string;
 }
 
-export const githubPublicationConfig = (env: Env): GithubPublicationConfig => {
+export function assertForkOnlyRepository(
+  repository: string,
+  forkOnlyMode: string | undefined,
+): void {
+  if (forkOnlyMode === "true" && repository.toLowerCase().startsWith("perkcommons/")) {
+    throw new RequestError(
+      "Fork-only mode refused an original PerkCommons repository.",
+      503,
+      "fork_only_violation",
+    );
+  }
+}
+
+export function githubTargetConfig(env: Env): GithubTargetConfig {
   const dataRepository = env.GITHUB_DATA_REPOSITORY ?? "PerkCommons/data";
   const dataBranch = env.GITHUB_DATA_BRANCH ?? "main";
   const headOwner = env.GITHUB_HEAD_OWNER ?? dataRepository.split("/")[0] ?? "";
   assertForkOnlyRepository(dataRepository, env.FORK_ONLY_MODE);
   return { dataRepository, dataBranch, headOwner };
-};
-```
-
-All publication/removal PR query paths must use `config.dataRepository`, `config.dataBranch`, and `config.headOwner`; specifically, the `head=` query becomes `${config.headOwner}:${branch}` rather than `PerkCommons:${branch}`.
-
-- [ ] **Step 4: Implement site-deployment abstraction**
-
-Create `worker/lib/deployment.ts` so Vercel is preferred when configured:
-
-```ts
-export const siteDeploymentConfigured = (env: Env): boolean =>
-  Boolean(env.VERCEL_DEPLOY_HOOK_URL || env.GITHUB_SITE_DEPLOY_TOKEN);
-
-export async function requestSiteDeployment(env: Env): Promise<void> {
-  if (env.VERCEL_DEPLOY_HOOK_URL) {
-    const response = await fetch(env.VERCEL_DEPLOY_HOOK_URL, {
-      method: "POST",
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!response.ok) throw new Error(`Vercel deploy hook failed (${response.status})`);
-    return;
-  }
-  if (env.GITHUB_SITE_DEPLOY_TOKEN) {
-    await dispatchSiteDeployment(env.GITHUB_SITE_DEPLOY_TOKEN);
-    return;
-  }
-  throw new RequestError(
-    "Automated site deployment is not configured.",
-    503,
-    "deployment_not_configured",
-  );
 }
 ```
 
-Update `publication.ts` and `removal.ts` so deployment readiness checks use `siteDeploymentConfigured(env)` and rebuild calls use `requestSiteDeployment(env)`.
+- [ ] **Step 4: Parameterize `publication-github.ts`**
 
-- [ ] **Step 5: Update publication/removal tests to assert fork paths**
+Remove:
 
-In the existing GitHub fetch mocks, assert paths contain:
-
-```text
-/repos/CodWasTaken/data/
+```ts
+const DATA_REPOSITORY = "PerkCommons/data";
+const SITE_REPOSITORY = "PerkCommons/site";
+const DATA_BRANCH = "main";
 ```
 
-and do not contain:
+Each data publication/removal/check/merge helper receives a `GithubTargetConfig`. Every `/repos/...` path uses `config.dataRepository`; base refs use `config.dataBranch`; open PR queries use `head=${config.headOwner}:${branch}`.
 
-```text
-/repos/PerkCommons/
-```
+Keep the legacy `dispatchSiteDeployment()` helper isolated for Cloudflare compatibility, but make its site repository an explicit parameter rather than a hard-coded original repository.
 
-The test environment must set:
+- [ ] **Step 5: Update publication/removal tests**
+
+Use this environment in GitHub mocks:
 
 ```ts
 GITHUB_DATA_REPOSITORY: "CodWasTaken/data",
 GITHUB_DATA_BRANCH: "main",
 GITHUB_HEAD_OWNER: "CodWasTaken",
 FORK_ONLY_MODE: "true",
-VERCEL_DEPLOY_HOOK_URL: "https://api.vercel.com/v1/integrations/deploy/test",
 ```
 
-- [ ] **Step 6: Run deployment/publication/removal tests**
+Assert every write/check/merge request path contains `/repos/CodWasTaken/data/` and no emitted request contains `/repos/PerkCommons/`.
+
+- [ ] **Step 6: Run tests**
 
 ```bash
 npx tsx --test worker/tests/deployment.test.ts worker/tests/publication.test.ts worker/tests/removal.test.ts
@@ -426,13 +384,133 @@ Expected: PASS.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add worker/lib/deployment.ts worker/lib/publication-github.ts worker/lib/publication.ts worker/lib/removal.ts worker/lib/types.ts worker/tests/deployment.test.ts worker/tests/publication.test.ts worker/tests/removal.test.ts
-git commit -m "feat(runtime): target fork publication and Vercel rebuilds"
+git add worker/lib/github-targets.ts worker/lib/publication-github.ts worker/lib/types.ts worker/tests/deployment.test.ts worker/tests/publication.test.ts worker/tests/removal.test.ts
+git commit -m "fix(publication): enforce fork-only GitHub targets"
 ```
 
 ---
 
-### Task 4: Add the Vercel Environment and API Function Adapters
+### Task 4: Add Vercel Rebuild Dispatch
+
+**Files:**
+- Create: `worker/lib/deployment.ts`
+- Modify: `worker/lib/publication.ts`
+- Modify: `worker/lib/removal.ts`
+- Modify: `worker/lib/types.ts`
+- Modify: `worker/tests/deployment.test.ts`
+- Modify: `worker/tests/publication.test.ts`
+- Modify: `worker/tests/removal.test.ts`
+
+**Interfaces:**
+- Produces: `siteDeploymentConfigured(env: Env): boolean`.
+- Produces: `requestSiteDeployment(env: Env): Promise<void>`.
+
+- [ ] **Step 1: Write failing deploy-hook tests**
+
+```ts
+import {
+  requestSiteDeployment,
+  siteDeploymentConfigured,
+} from "../lib/deployment";
+
+test("a Vercel deploy hook configures site deployment", () => {
+  assert.equal(
+    siteDeploymentConfigured({
+      VERCEL_DEPLOY_HOOK_URL: "https://api.vercel.com/v1/integrations/deploy/test",
+    } as Env),
+    true,
+  );
+});
+```
+
+Mock global `fetch`, call `requestSiteDeployment()`, and assert a single `POST` to the exact hook URL with no secret-bearing response body/log output.
+
+- [ ] **Step 2: Run and confirm missing-module failure**
+
+```bash
+npx tsx --test worker/tests/deployment.test.ts
+```
+
+- [ ] **Step 3: Implement deployment transport**
+
+```ts
+import { RequestError } from "./http";
+import { dispatchSiteDeployment } from "./publication-github";
+import type { Env } from "./types";
+
+export const siteDeploymentConfigured = (env: Env): boolean =>
+  Boolean(env.VERCEL_DEPLOY_HOOK_URL || env.GITHUB_SITE_DEPLOY_TOKEN);
+
+export async function requestSiteDeployment(env: Env): Promise<void> {
+  if (env.VERCEL_DEPLOY_HOOK_URL) {
+    const response = await fetch(env.VERCEL_DEPLOY_HOOK_URL, {
+      method: "POST",
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) {
+      throw new RequestError(
+        "The Vercel deployment request failed.",
+        502,
+        "deployment_request_failed",
+      );
+    }
+    return;
+  }
+
+  if (env.GITHUB_SITE_DEPLOY_TOKEN && env.GITHUB_SITE_REPOSITORY) {
+    await dispatchSiteDeployment(
+      env.GITHUB_SITE_DEPLOY_TOKEN,
+      env.GITHUB_SITE_REPOSITORY,
+    );
+    return;
+  }
+
+  throw new RequestError(
+    "Automated site deployment is not configured.",
+    503,
+    "deployment_not_configured",
+  );
+}
+```
+
+Add `GITHUB_SITE_REPOSITORY?: string` and `VERCEL_DEPLOY_HOOK_URL?: string` to `Env`.
+
+- [ ] **Step 4: Route publication/removal through the abstraction**
+
+In `publication.ts`, replace the current two-token requirement with:
+
+```ts
+if (!env.GITHUB_DATA_PUBLICATION_TOKEN || !siteDeploymentConfigured(env)) {
+  throw new RequestError(
+    "Automated publication is not configured.",
+    503,
+    "publication_not_configured",
+  );
+}
+```
+
+Use `githubTargetConfig(env)` for every GitHub helper call and `requestSiteDeployment(env)` after finalization.
+
+In `removal.ts`, use the same target config and deployment abstraction; reconciliation must not require `GITHUB_SITE_DEPLOY_TOKEN` when `VERCEL_DEPLOY_HOOK_URL` exists.
+
+- [ ] **Step 5: Run deployment/publication/removal tests**
+
+```bash
+npx tsx --test worker/tests/deployment.test.ts worker/tests/publication.test.ts worker/tests/removal.test.ts
+```
+
+Expected: PASS.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add worker/lib/deployment.ts worker/lib/publication.ts worker/lib/removal.ts worker/lib/types.ts worker/tests/deployment.test.ts worker/tests/publication.test.ts worker/tests/removal.test.ts
+git commit -m "feat(deploy): trigger Vercel rebuilds after publication"
+```
+
+---
+
+### Task 5: Add the Vercel API Runtime Adapter
 
 **Files:**
 - Create: `vercel/runtime-env.ts`
@@ -444,75 +522,62 @@ git commit -m "feat(runtime): target fork publication and Vercel rebuilds"
 
 **Interfaces:**
 - Produces: `vercelEnv(source?: NodeJS.ProcessEnv): Env`.
-- Produces: a default Vercel Node handler that forwards all `/api/*` methods to `routeApiRequest()`.
+- Produces a catch-all Node Function forwarding `/api/*` to `routeApiRequest()`.
 
-- [ ] **Step 1: Add dependencies**
-
-Run:
+- [ ] **Step 1: Add Vercel runtime dependencies**
 
 ```bash
 npm install @vercel/node @vercel/functions
 ```
 
-This updates both `package.json` and `package-lock.json`.
-
-- [ ] **Step 2: Add failing environment validation tests**
-
-Add:
+- [ ] **Step 2: Add failing environment tests**
 
 ```ts
 import { vercelEnv } from "../../vercel/runtime-env";
 
-test("Vercel environment requires isolated server secrets", () => {
-  assert.throws(
-    () => vercelEnv({ VERCEL: "1" }),
-    /SUPABASE_URL/,
-  );
+test("Vercel environment requires server Supabase values", () => {
+  assert.throws(() => vercelEnv({ VERCEL: "1" }), /SUPABASE_URL/);
 });
 
-test("Vercel environment enables fork-only repository targeting", () => {
+test("Vercel adapter always enables fork-only mode", () => {
   const result = vercelEnv({
     VERCEL: "1",
     SUPABASE_URL: "https://example.supabase.co",
     SUPABASE_PUBLISHABLE_KEY: "public",
     SUPABASE_SERVICE_ROLE_KEY: "service",
     SUBMISSION_FINGERPRINT_SECRET: "0123456789abcdef0123456789abcdef",
-    GITHUB_DATA_REPOSITORY: "CodWasTaken/data",
-    GITHUB_DATA_BRANCH: "main",
-    GITHUB_HEAD_OWNER: "CodWasTaken",
-    FORK_ONLY_MODE: "true",
   });
   assert.equal(result.GITHUB_DATA_REPOSITORY, "CodWasTaken/data");
+  assert.equal(result.GITHUB_DATA_BRANCH, "main");
+  assert.equal(result.GITHUB_HEAD_OWNER, "CodWasTaken");
   assert.equal(result.FORK_ONLY_MODE, "true");
 });
 ```
 
-- [ ] **Step 3: Implement strict Vercel env construction**
-
-Create `vercel/runtime-env.ts` with a helper that throws using the variable name only, never its value:
+- [ ] **Step 3: Implement strict environment construction**
 
 ```ts
 const required = (source: NodeJS.ProcessEnv, name: string): string => {
   const value = source[name]?.trim();
-  if (!value) throw new Error(`Missing required Vercel environment variable: ${name}`);
+  if (!value) {
+    throw new Error(`Missing required Vercel environment variable: ${name}`);
+  }
   return value;
 };
 ```
 
-Construct `Env` from the required Supabase/fingerprint values and optional Turnstile/GitHub/deploy-hook values. Force these repository defaults for this Vercel adapter when variables are omitted:
+`vercelEnv()` requires `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUBMISSION_FINGERPRINT_SECRET`. It maps optional `TURNSTILE_SECRET_KEY`, `GITHUB_DATA_PUBLICATION_TOKEN`, `VERCEL_DEPLOY_HOOK_URL`, and `CRON_SECRET`. It forces:
 
 ```ts
-GITHUB_DATA_REPOSITORY: source.GITHUB_DATA_REPOSITORY ?? "CodWasTaken/data",
-GITHUB_DATA_BRANCH: source.GITHUB_DATA_BRANCH ?? "main",
-GITHUB_HEAD_OWNER: source.GITHUB_HEAD_OWNER ?? "CodWasTaken",
+GITHUB_DATA_REPOSITORY: "CodWasTaken/data",
+GITHUB_DATA_BRANCH: "main",
+GITHUB_HEAD_OWNER: "CodWasTaken",
 FORK_ONLY_MODE: "true",
 ```
 
-Do not expose `SUPABASE_SERVICE_ROLE_KEY` or other server-only values through `PUBLIC_*` names.
+unless an explicitly supplied non-original fork value is validated by `githubTargetConfig()`.
 
-- [ ] **Step 4: Implement catch-all Node Function adapter**
-
-`api/[...path].ts` must reconstruct the public URL and request body, invoke the shared Web router, then copy status/headers/body back to `VercelResponse`:
+- [ ] **Step 4: Implement the catch-all Node Function**
 
 ```ts
 import type { VercelRequest, VercelResponse } from "@vercel/node";
@@ -521,7 +586,11 @@ import { vercelEnv } from "../vercel/runtime-env";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const host = req.headers.host ?? process.env.VERCEL_PROJECT_PRODUCTION_URL;
-  if (!host) return res.status(400).json({ error: { code: "invalid_host", message: "Request host is missing." } });
+  if (!host) {
+    return res.status(400).json({
+      error: { code: "invalid_host", message: "Request host is missing." },
+    });
+  }
 
   const headers = new Headers();
   for (const [key, value] of Object.entries(req.headers)) {
@@ -531,25 +600,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const init: RequestInit = { method: req.method, headers };
   if (req.method !== "GET" && req.method !== "HEAD") {
-    init.body = typeof req.body === "string" ? req.body : JSON.stringify(req.body ?? {});
+    init.body = typeof req.body === "string"
+      ? req.body
+      : JSON.stringify(req.body ?? {});
   }
 
   const response = await routeApiRequest(
     new Request(`https://${host}${req.url ?? "/api"}`, init),
     vercelEnv(),
   );
+
   res.status(response.status);
   response.headers.forEach((value, key) => res.setHeader(key, value));
   res.send(Buffer.from(await response.arrayBuffer()));
 }
 ```
 
-- [ ] **Step 5: Document environment names without values**
+- [ ] **Step 5: Document variable names only**
 
 Append to `.env.example`:
 
 ```dotenv
-# Vercel Next-development server-only variables
+# Vercel Next-development server runtime
 SUPABASE_URL=
 SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
@@ -564,7 +636,7 @@ VERCEL_DEPLOY_HOOK_URL=
 CRON_SECRET=
 ```
 
-- [ ] **Step 6: Run type checks and runtime tests**
+- [ ] **Step 6: Run type/unit tests**
 
 ```bash
 npm run check
@@ -582,20 +654,20 @@ git commit -m "feat(vercel): add API runtime adapter"
 
 ---
 
-### Task 5: Preserve Tombstones and Moderator Protection with Routing Middleware
+### Task 6: Preserve Tombstones and Moderator Route Protection
 
 **Files:**
 - Create: `middleware.ts`
-- Create or modify: `vercel.json`
+- Create: `vercel.json`
 - Modify: `worker/tests/runtime-adapters.test.ts`
 
 **Interfaces:**
-- Consumes: `vercelEnv()`, `isListingRemoved(env, listingId)`, `requireModerator(request, env)`.
-- Produces: default Vercel middleware and matcher covering `/opportunities/:path*`, `/moderate`, and `/moderate/:path*`.
+- Consumes: `vercelEnv()`, `isListingRemoved()`, `requireModerator()`.
+- Produces: Vercel middleware for `/opportunities/:path*`, `/moderate`, and `/moderate/:path*`.
 
-- [ ] **Step 1: Extract middleware decision logic into testable functions**
+- [ ] **Step 1: Add a failing path parser test**
 
-Inside `middleware.ts`, export:
+Middleware exports:
 
 ```ts
 export const listingIdFromPath = (pathname: string): string | null => {
@@ -604,25 +676,34 @@ export const listingIdFromPath = (pathname: string): string | null => {
 };
 ```
 
-Add tests asserting category/index routes do not become listing IDs and one listing slug does.
+Tests:
 
-- [ ] **Step 2: Run the focused test and confirm failure until middleware exists**
+```ts
+test("listing path parser ignores the directory index", () => {
+  assert.equal(listingIdFromPath("/opportunities/"), null);
+});
 
-```bash
-npx tsx --test worker/tests/runtime-adapters.test.ts
+test("listing path parser accepts one stable listing slug", () => {
+  assert.equal(
+    listingIdFromPath("/opportunities/example-grant/"),
+    "example-grant",
+  );
+});
 ```
 
-Expected: FAIL on missing `middleware.ts` import.
+- [ ] **Step 2: Implement Vercel middleware**
 
-- [ ] **Step 3: Implement Vercel middleware**
+Use `next` from `@vercel/functions`.
 
-Use `next` from `@vercel/functions`. For a listing path, call `isListingRemoved()`; if removed, return the same 410 HTML contract currently emitted by `worker/index.ts`. For `/moderate` and descendants, call `requireModerator()` and redirect unauthenticated requests to `/moderator-login/?next=/moderate/`. Otherwise return `next()`.
+For a listing detail path, query `isListingRemoved(vercelEnv(), listingId)`. If removed, return the same HTTP 410 HTML body currently used by the Worker.
 
-The middleware must not intercept `/api/*`; those requests belong to the Function adapter.
+For `/moderate` and descendants, call `requireModerator(request, vercelEnv())`. On auth failure, redirect to `/moderator-login/` and set `next=/moderate/`.
 
-- [ ] **Step 4: Add the matcher and platform security headers to `vercel.json`**
+For allowed requests, return `next()`.
 
-Use:
+Do not match `/api/*`.
+
+- [ ] **Step 3: Create `vercel.json`**
 
 ```json
 {
@@ -647,9 +728,9 @@ Use:
 }
 ```
 
-Keep CSP/HSTS out of this migration unless the existing project already has an exact tested policy; do not invent a looser or incompatible policy while changing runtimes.
+Do not introduce a new CSP or HSTS value unless an existing tested project policy can be copied exactly; this runtime migration must not guess at a weaker or incompatible policy.
 
-- [ ] **Step 5: Run type/unit tests**
+- [ ] **Step 4: Run checks**
 
 ```bash
 npm run check
@@ -658,16 +739,16 @@ npm test
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add middleware.ts vercel.json worker/tests/runtime-adapters.test.ts
-git commit -m "feat(vercel): preserve edge route protections"
+git commit -m "feat(vercel): preserve protected routes"
 ```
 
 ---
 
-### Task 6: Replace the Worker Schedule with Protected Vercel Cron
+### Task 7: Replace Worker Scheduling with Protected Vercel Cron
 
 **Files:**
 - Create: `api/cron/reconcile.ts`
@@ -675,48 +756,50 @@ git commit -m "feat(vercel): preserve edge route protections"
 - Test: `worker/tests/vercel-cron.test.ts`
 
 **Interfaces:**
-- Produces: `runReconciliation(env: Env): Promise<void>` calling publication then removal reconciliation.
-- Produces: cron handler requiring `Authorization: Bearer ${CRON_SECRET}`.
+- Produces: `authorizeCron(authorization: string | undefined, secret: string | undefined): boolean`.
+- Produces: `runReconciliation(env: Env): Promise<void>` with publication-before-removal order.
 
-- [ ] **Step 1: Write failing order and authorization tests**
-
-Create tests around an exported `authorizeCron(authorization: string | undefined, secret: string | undefined): boolean` and `runReconciliation()` with injected reconciliation functions so order is observable:
+- [ ] **Step 1: Write failing auth tests**
 
 ```ts
-test("cron rejects missing authorization", () => {
+import assert from "node:assert/strict";
+import test from "node:test";
+import { authorizeCron } from "../../api/cron/reconcile";
+
+test("cron rejects missing credentials", () => {
   assert.equal(authorizeCron(undefined, "secret"), false);
 });
 
-test("cron uses exact bearer secret", () => {
+test("cron requires exact bearer secret", () => {
   assert.equal(authorizeCron("Bearer secret", "secret"), true);
   assert.equal(authorizeCron("Bearer wrong", "secret"), false);
 });
 ```
 
-- [ ] **Step 2: Run and confirm failure**
+- [ ] **Step 2: Run and confirm missing-module failure**
 
 ```bash
 npx tsx --test worker/tests/vercel-cron.test.ts
 ```
 
-Expected: FAIL because the cron module does not exist.
+- [ ] **Step 3: Implement protected reconciliation**
 
-- [ ] **Step 3: Implement the cron endpoint**
-
-The handler must:
+The handler must return 401 unless:
 
 ```ts
-if (!authorizeCron(req.headers.authorization, process.env.CRON_SECRET)) {
-  return res.status(401).json({ success: false });
-}
-await reconcilePublicationBatches(env);
-await reconcileListingRemovals(env);
-return res.status(200).json({ success: true });
+authorization === `Bearer ${process.env.CRON_SECRET}`
 ```
 
-Wrap reconciliation in `try/catch`, log only the phase/error name, and return 500 on failure.
+Then execute:
 
-- [ ] **Step 4: Configure the production cron**
+```ts
+await reconcilePublicationBatches(env);
+await reconcileListingRemovals(env);
+```
+
+On failure, log only `event`, reconciliation phase, and `error.name`, and return 500.
+
+- [ ] **Step 4: Add the production cron definition**
 
 Add to `vercel.json`:
 
@@ -729,7 +812,7 @@ Add to `vercel.json`:
 ]
 ```
 
-The cron exists only on Vercel production deployments. If Vercel rejects the two-minute schedule for the connected plan, stop and report the platform-plan limitation rather than silently changing semantics.
+If the connected Vercel plan rejects a two-minute schedule, stop and report that plan limitation; do not silently change reconciliation semantics.
 
 - [ ] **Step 5: Run tests**
 
@@ -748,21 +831,19 @@ git commit -m "feat(vercel): add protected reconciliation cron"
 
 ---
 
-### Task 7: Make Vercel Builds Fork-Safe and Generate Correct Canonicals
+### Task 8: Make Vercel Builds Fork-Safe and Canonical-Safe
 
 **Files:**
 - Modify: `scripts/fetch-data.mjs`
 - Modify: `astro.config.ts`
-- Modify: `package.json`
-- Test: existing unit/build checks
 
 **Interfaces:**
-- Vercel build consumes `PERKCOMMONS_DATA_REPOSITORY=https://github.com/CodWasTaken/data.git` and `PERKCOMMONS_DATA_REF=main`.
-- Astro `site` resolves to the generated Vercel production hostname when present.
+- Vercel requires `PERKCOMMONS_DATA_REPOSITORY` and `PERKCOMMONS_DATA_REF`.
+- Astro derives its `site` from the Vercel production URL when available.
 
-- [ ] **Step 1: Add a fail-closed Vercel data-source guard**
+- [ ] **Step 1: Fail closed on missing Vercel data source**
 
-In `scripts/fetch-data.mjs`, before cloning:
+Before clone execution in `scripts/fetch-data.mjs`:
 
 ```js
 const isVercel = process.env.VERCEL === "1";
@@ -776,21 +857,24 @@ if (isVercel && (!configuredRepository || !configuredRef)) {
 }
 ```
 
-Then keep the non-Vercel fallback for existing local/Cloudflare workflows only.
+Retain the existing non-Vercel fallback only for local/legacy Cloudflare build paths.
 
-- [ ] **Step 2: Derive the Astro site URL safely**
+- [ ] **Step 2: Generate correct Vercel canonicals/sitemap**
 
-Use:
+In `astro.config.ts`:
 
 ```ts
 const vercelProductionHost = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
-const site = process.env.PUBLIC_SITE_URL?.trim()
-  ?? (vercelProductionHost ? `https://${vercelProductionHost}` : "https://perkcommons.com");
+const site =
+  process.env.PUBLIC_SITE_URL?.trim() ??
+  (vercelProductionHost
+    ? `https://${vercelProductionHost}`
+    : "https://perkcommons.com");
 ```
 
-Pass `site` to `defineConfig`. This prevents the Vercel Next-dev sitemap/canonicals from claiming `perkcommons.com`.
+Pass `site` to `defineConfig()`.
 
-- [ ] **Step 3: Run a fork-data build**
+- [ ] **Step 3: Run a Vercel-targeted build**
 
 ```bash
 PERKCOMMONS_DATA_REPOSITORY=https://github.com/CodWasTaken/data.git \
@@ -800,9 +884,9 @@ VERCEL_PROJECT_PRODUCTION_URL=perkcommons-next-dev.vercel.app \
 npm run build
 ```
 
-Expected: build succeeds, Pagefind indexes the catalogue, and generated Trust/Privacy/About pages exist.
+Expected: Astro build and Pagefind succeed.
 
-- [ ] **Step 4: Verify generated content**
+- [ ] **Step 4: Verify Trust/Privacy/About output and Vercel canonical**
 
 ```bash
 test -f dist/index.html
@@ -812,27 +896,22 @@ test -f dist/about/index.html
 grep -R "perkcommons-next-dev.vercel.app" dist/sitemap* dist/*.html >/dev/null
 ```
 
-Expected: all checks pass.
+Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add scripts/fetch-data.mjs astro.config.ts package.json package-lock.json
-git commit -m "build(vercel): pin next-dev data and site URL"
+git add scripts/fetch-data.mjs astro.config.ts
+git commit -m "build(vercel): pin next-dev data and canonical URL"
 ```
 
 ---
 
-### Task 8: Full Verification Before Opening the Migration PR
+### Task 9: Full Verification and Migration PR
 
-**Files:**
-- No new production files unless a failing test requires a scoped fix.
+**Files:** no planned new production files.
 
-**Interfaces:**
-- Consumes all prior tasks.
-- Produces a reviewable migration branch with green tests and build.
-
-- [ ] **Step 1: Run all unit/type checks**
+- [ ] **Step 1: Run the full test suite**
 
 ```bash
 npm ci
@@ -841,7 +920,7 @@ npm test
 
 Expected: all tests pass; zero Astro/TypeScript diagnostics.
 
-- [ ] **Step 2: Run the Vercel-targeted production build**
+- [ ] **Step 2: Run the Vercel-targeted build**
 
 ```bash
 PERKCOMMONS_DATA_REPOSITORY=https://github.com/CodWasTaken/data.git \
@@ -851,56 +930,64 @@ VERCEL_PROJECT_PRODUCTION_URL=perkcommons-next-dev.vercel.app \
 npm run build
 ```
 
-Expected: success.
+Expected: PASS.
 
-- [ ] **Step 3: Run browser tests against the local static build where applicable**
+- [ ] **Step 3: Run browser coverage**
 
 ```bash
 npm run test:browser
 ```
 
-Expected: existing supported browser suite passes; existing intentional skips remain documented.
+Expected: supported browser tests pass; only already-intentional skips remain.
 
-- [ ] **Step 4: Inspect the diff for forbidden targets and secrets**
+- [ ] **Step 4: Scan the diff for forbidden write targets and committed secrets**
 
 ```bash
-git diff main...HEAD -- . ':!package-lock.json' | grep -n "PerkCommons/data\|PerkCommons/site\|perkcommons.com" || true
-git diff main...HEAD | grep -nE "SUPABASE_SERVICE_ROLE_KEY=.+|SUBMISSION_FINGERPRINT_SECRET=.+|CRON_SECRET=.+|VERCEL_DEPLOY_HOOK_URL=https://" && exit 1 || true
+git diff main...HEAD -- . ':!package-lock.json' | grep -n "PerkCommons/data\|PerkCommons/site" || true
+git diff main...HEAD | grep -nE "SUPABASE_SERVICE_ROLE_KEY=.+|SUBMISSION_FINGERPRINT_SECRET=.+|CRON_SECRET=.+|TURNSTILE_SECRET_KEY=.+|VERCEL_DEPLOY_HOOK_URL=https://" && exit 1 || true
 ```
 
-Manually confirm any remaining `PerkCommons/*` strings are compatibility defaults outside Vercel fork-only execution, documentation explaining forbidden targets, or tests that assert refusal. No new write path may target them.
+Any remaining `PerkCommons/*` references must be a compatibility default outside Vercel fork-only execution, documentation naming a forbidden target, or a refusal test. No new request path may write to them.
 
-- [ ] **Step 5: Open a PR to `CodWasTaken/site` `main`**
+- [ ] **Step 5: Open the migration PR**
 
-PR title:
+Title:
 
 ```text
 feat(vercel): migrate Next dev runtime
 ```
 
-PR body must state that the Cloudflare Next-development Worker and all original `PerkCommons/*` infrastructure are intentionally untouched.
+Body explicitly states:
+
+```text
+This PR changes only the CodWasTaken development fork. It does not deploy,
+modify, route, or attach perkcommons.com, the original PerkCommons/*
+repositories, the production Cloudflare Worker, or the existing Next-dev
+Cloudflare rollback Worker.
+```
 
 - [ ] **Step 6: Review CI before merge**
 
-Do not merge on a red code/test/build check. Artifact-upload-only failures may be classified separately only after verifying test/build steps themselves succeeded.
+Do not merge while code/test/build checks are red. If only artifact upload fails, inspect the job steps and separately verify that tests and build succeeded before classifying it as CI infrastructure noise.
 
 ---
 
-### Task 9: Create and Configure the Isolated Vercel Project
+### Task 10: Create the Isolated Vercel Project and Configure It
 
-**Platform:** Vercel team `Cod's projects`
+**Platform:** Vercel team `Cod's projects`.
 
 **Interfaces:**
-- Produces Vercel project `perkcommons-next-dev`.
+- Produces project `perkcommons-next-dev`.
 - Production source: `CodWasTaken/site`, branch `main`.
-- Produces a generated `*.vercel.app` production URL.
+- Produces generated `*.vercel.app` production URL.
 
-- [ ] **Step 1: Create/link the project without a custom domain**
+- [ ] **Step 1: Create/link the Git-backed project**
 
-Use the connected Vercel account/team. Project requirements:
+Required project settings:
 
 ```text
-Name: perkcommons-next-dev
+Project: perkcommons-next-dev
+Repository: CodWasTaken/site
 Framework: Astro
 Production branch: main
 Build command: npm run build
@@ -908,11 +995,11 @@ Output directory: dist
 Custom domains: none
 ```
 
-If the connector cannot create/link a Git-backed project, stop at this step and report that exact connector limitation; do not substitute the production domain or another hosting account.
+If the connected Vercel tools cannot create/link a Git-backed project, stop at this exact step and report the connector limitation. Do not substitute the production PerkCommons project, a different account, or a custom domain.
 
-- [ ] **Step 2: Configure build-time fork variables**
+- [ ] **Step 2: Set build-time fork variables**
 
-Set for Production (and Preview if branch previews are enabled):
+Production values:
 
 ```text
 PERKCOMMONS_DATA_REPOSITORY=https://github.com/CodWasTaken/data.git
@@ -923,9 +1010,9 @@ GITHUB_HEAD_OWNER=CodWasTaken
 FORK_ONLY_MODE=true
 ```
 
-- [ ] **Step 3: Configure the existing isolated Next-dev public Supabase/Turnstile values**
+- [ ] **Step 3: Set isolated public environment values**
 
-Set the existing values under these names:
+Use the existing Next-dev Supabase/Turnstile values under:
 
 ```text
 PUBLIC_SUPABASE_URL
@@ -935,11 +1022,11 @@ SUPABASE_URL
 SUPABASE_PUBLISHABLE_KEY
 ```
 
-`SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` use the same isolated project endpoint/public key as their `PUBLIC_*` counterparts.
+`SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` point to the same isolated project/public key as their `PUBLIC_*` counterparts.
 
-- [ ] **Step 4: Configure server-only secrets**
+- [ ] **Step 4: Set isolated server-only secrets**
 
-Set the existing isolated values under:
+Required names:
 
 ```text
 SUPABASE_SERVICE_ROLE_KEY
@@ -949,53 +1036,42 @@ GITHUB_DATA_PUBLICATION_TOKEN
 CRON_SECRET
 ```
 
-Do not copy values from production PerkCommons infrastructure. If these values are not available through connected secret management, stop and report the missing variable names only; never invent values and never paste secrets into GitHub.
+Use only the existing isolated Next-dev values. If the connected tools cannot read/set these secret values, stop and report the missing variable names only. Never invent them or commit them.
 
-- [ ] **Step 5: Create a Vercel Deploy Hook for `main`**
-
-Create a hook named:
+- [ ] **Step 5: Create the data-rebuild Deploy Hook**
 
 ```text
-perkcommons-data-rebuild
+Name: perkcommons-data-rebuild
+Branch: main
 ```
 
-Target branch:
-
-```text
-main
-```
-
-Store its URL only in the Vercel server variable:
+Store the returned hook URL only as:
 
 ```text
 VERCEL_DEPLOY_HOOK_URL
 ```
 
-- [ ] **Step 6: Enable automatic Git production deployments**
+- [ ] **Step 6: Enable automatic `main` production deployments**
 
-Confirm `CodWasTaken/site` `main` pushes automatically create Vercel production deployments. Do not connect `PerkCommons/site`.
+Confirm pushes to `CodWasTaken/site` `main` automatically create production deployments. Confirm `PerkCommons/site` is not connected.
 
 ---
 
-### Task 10: First Production Deployment and Runtime Smoke Tests
+### Task 11: First Vercel Production Deployment and Smoke Test
 
-**Platform:** Vercel project `perkcommons-next-dev`
+**Platform:** `perkcommons-next-dev`.
 
-**Interfaces:**
-- Produces the final generated `https://<alias>.vercel.app` URL.
-- Confirms runtime parity without touching the Cloudflare fallback.
+- [ ] **Step 1: Deploy merged `main` to Vercel production**
 
-- [ ] **Step 1: Deploy the merged `main` branch to Vercel production**
+Wait until deployment status is `READY`. Record the deployment ID and generated production alias.
 
-Wait for Vercel state `READY`. Record the immutable deployment ID and production alias.
+- [ ] **Step 2: Inspect build logs**
 
-- [ ] **Step 2: Check build logs before smoke tests**
-
-Confirm the build used `CodWasTaken/data`, completed Astro generation, and generated Pagefind output. Any build failure blocks rollout.
+Require successful dependency install, tests/build if configured in the deployment pipeline, Astro generation, fork data fetch, and Pagefind generation. A build error blocks rollout.
 
 - [ ] **Step 3: Smoke-test static pages**
 
-Fetch and require HTTP 200 for:
+Require HTTP 200 for:
 
 ```text
 /
@@ -1006,27 +1082,33 @@ Fetch and require HTTP 200 for:
 /moderator-login/
 ```
 
-Require `/trust/` to contain `Trust and transparency`, `/privacy/` to contain `A plain-language privacy notice.`, and `/about/` to contain `operated by Cod from Poland`.
+Require these markers:
+
+```text
+/trust/   -> Trust and transparency
+/privacy/ -> A plain-language privacy notice.
+/about/   -> operated by Cod from Poland
+```
 
 - [ ] **Step 4: Smoke-test protected routing**
 
-Request `/moderate/` without a moderator cookie and require a 302/307 redirect to `/moderator-login/` with `next=/moderate/`.
+Request `/moderate/` without a moderator cookie. Require redirect to `/moderator-login/` with `next=/moderate/`.
 
-Select one known active listing and require its detail route to return 200. Do not create a fake removal solely for smoke testing.
+Fetch one known active listing and require 200. Do not create a fake removal merely to test 410 behavior.
 
-- [ ] **Step 5: Smoke-test API safety without creating real submissions**
+- [ ] **Step 5: Smoke-test API safety without creating real records**
 
-Require an unknown API path such as `/api/does-not-exist` to return the JSON 404 contract. Send an intentionally invalid content type to `/api/submissions` and require 415; do not submit a valid record.
+Require `/api/does-not-exist` to return the existing JSON 404 contract. Send an invalid content type to `/api/submissions` and require 415. Do not submit a valid opportunity/report during smoke testing.
 
-- [ ] **Step 6: Verify cron protection**
+- [ ] **Step 6: Verify cron protection and execution**
 
-Request `/api/cron/reconcile` without authorization and require 401. Then trigger the deployed cron through Vercel's cron tooling and confirm 200 without exposing `CRON_SECRET`.
+Unauthenticated `/api/cron/reconcile` must return 401. Trigger the deployed cron through Vercel's cron tooling and require 200 without exposing `CRON_SECRET`.
 
-- [ ] **Step 7: Inspect runtime errors**
+- [ ] **Step 7: Inspect Vercel runtime errors**
 
-Check Vercel runtime errors/logs for the deployment after smoke traffic. Require no unexplained 5xx clusters.
+Check deployment runtime errors/logs after smoke traffic. Require no unexplained 5xx cluster.
 
-- [ ] **Step 8: Verify the Cloudflare rollback endpoint remains unchanged**
+- [ ] **Step 8: Confirm Cloudflare rollback remains unchanged**
 
 Fetch:
 
@@ -1034,19 +1116,19 @@ Fetch:
 https://perkcommons-next-fork-dev.cod3eater.workers.dev
 ```
 
-Do not deploy, reconfigure, delete, or attach it to Vercel. Its continued availability is the rollback proof.
+Do not deploy, update, delete, or attach this Worker. Its continued availability is the rollback proof.
 
-- [ ] **Step 9: Report completion with exact URLs and immutable identifiers**
+- [ ] **Step 9: Completion report**
 
-Report:
+Report exact values for:
 
 ```text
 Vercel project name
 Vercel production URL
 Vercel deployment ID
-GitHub migration PR
+GitHub migration PR URL
 Merged commit SHA
 Cloudflare rollback URL
 ```
 
-Do not claim completion until Vercel is `READY` and the smoke tests above pass.
+Do not claim the migration is complete until the Vercel deployment is `READY` and all smoke tests above pass.
