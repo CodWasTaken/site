@@ -14,11 +14,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Diagnose root-copy Vercel deployment
+      - name: Diagnose fresh Next Vercel deployment
         shell: bash
         run: |
           set -euo pipefail
-          base="https://perkcommons-next-dev-final-fvz266rh6-cod-s-projects1.vercel.app"
+          base="https://perkcommons-next-bkt0nxm2n-cod-s-projects1.vercel.app"
           code=$(curl -sS -L -D /tmp/headers -o /tmp/home.html -w '%{http_code}' "$base/")
           echo "HTTP_STATUS=$code"
           grep -Ei '^(HTTP/|content-type:|location:|server:|x-vercel-|cache-control:)' /tmp/headers || true
