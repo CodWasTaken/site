@@ -26,6 +26,20 @@ jobs:
           PERKCOMMONS_DATA_REPOSITORY_PATH: ${{ github.workspace }}/.data
       - run: npm run audit:site
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:browser
+      - name: Run browser regression suite
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:browser 2>&1 | tee playwright-test.log
         env:
           PERKCOMMONS_DATA_REPOSITORY_PATH: ${{ github.workspace }}/.data
+      - name: Upload browser diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-regression-diagnostics
+          path: |
+            playwright-test.log
+            test-results
+          if-no-files-found: warn
+          retention-days: 1
