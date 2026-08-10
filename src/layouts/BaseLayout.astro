@@ -210,6 +210,8 @@ const structuredData = baseStructuredData(Astro.site!);
             if (!toggle?.dataset.featureToggle) return;
             const auth = await fetch("/api/auth/me");
             if (!auth.ok) return;
+            const authState = (await auth.json()) as { moderator?: unknown };
+            if (!authState.moderator) return;
             const id = toggle.dataset.featureToggle;
             let featured = states.get(id)?.featured ?? false;
             const featureStatus = document.querySelector<HTMLElement>(
