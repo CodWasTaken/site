@@ -63,3 +63,11 @@ test("llms.txt identifies the experimental fork and public data entry points", a
   assert.match(llms, /CodWasTaken\/site/);
   assert.match(llms, /CodWasTaken\/data/);
 });
+
+test("social preview is a 1200x630 PNG", async () => {
+  const image = await readFile(resolve("public/brand/social-card.png")).catch(() => null);
+  assert.ok(image, "public/brand/social-card.png must exist");
+  assert.equal(image.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+  assert.equal(image.readUInt32BE(16), 1200);
+  assert.equal(image.readUInt32BE(20), 630);
+});
