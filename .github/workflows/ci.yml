@@ -24,6 +24,8 @@ jobs:
       - run: npm run build
         env:
           PERKCOMMONS_DATA_REPOSITORY_PATH: ${{ github.workspace }}/.data
+      - name: Diagnose generated H1 markup
+        run: node -e "const fs=require('node:fs'); const html=fs.readFileSync('dist/404.html','utf8'); const i=html.toLowerCase().indexOf('h1'); console.log({includesOpenH1:html.toLowerCase().includes('<h1'),index:i,snippet:i>=0?html.slice(Math.max(0,i-80),i+180):html.slice(0,300)});"
       - run: npm run audit:site
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
