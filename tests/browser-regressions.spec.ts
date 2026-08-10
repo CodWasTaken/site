@@ -12,12 +12,17 @@ const representativeRoutes = [
 
 const installRuntimeCollectors = (page: Page) => {
   const errors = {
-    console: [] as string[],
+    console: [] as Array<{ text: string; url: string }>,
     page: [] as string[],
     requests: [] as string[],
   };
   page.on("console", (message) => {
-    if (message.type() === "error") errors.console.push(message.text());
+    if (message.type() === "error") {
+      errors.console.push({
+        text: message.text(),
+        url: message.location().url,
+      });
+    }
   });
   page.on("pageerror", (error) => errors.page.push(error.message));
   page.on("requestfailed", (request) => {
@@ -46,6 +51,19 @@ const mockStaticPreviewWorkerDependencies = async (page: Page) => {
   );
 };
 
+const isExpectedDocument404 = (
+  error: { text: string; url: string },
+  route: (typeof representativeRoutes)[number],
+) => {
+  if (route.status !== 404) return false;
+  if (error.text !== "Failed to load resource: the server responded with a status of 404 (Not Found)") return false;
+  try {
+    return new URL(error.url).pathname === route.path;
+  } catch {
+    return false;
+  }
+};
+
 test("representative routes have no console, page, or resource-load regressions", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "Runtime regression sweep runs once in desktop Chromium.");
   await mockStaticPreviewWorkerDependencies(page);
@@ -58,7 +76,10 @@ test("representative routes have no console, page, or resource-load regressions"
 
     const response = await page.goto(route.path, { waitUntil: "networkidle" });
     expect(response?.status(), `${route.path} status`).toBe(route.status);
-    expect(errors.console, `${route.path} console errors`).toEqual([]);
+    expect(
+      errors.console.filter((error) => !isExpectedDocument404(error, route)),
+      `${route.path} console errors`,
+    ).toEqual([]);
     expect(errors.page, `${route.path} page errors`).toEqual([]);
     expect(errors.requests, `${route.path} failed requests`).toEqual([]);
   }
