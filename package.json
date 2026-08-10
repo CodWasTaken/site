@@ -12,7 +12,7 @@
     "fetch:data": "node scripts/fetch-data.mjs",
     "sync:taxonomy": "node scripts/sync-taxonomy.mjs",
     "prebuild": "npm run fetch:data",
-    "build": "astro check && astro build && pagefind --site dist",
+    "build": "astro check && astro build && node scripts/postbuild-site-assets.mjs && pagefind --site dist",
     "preview": "astro preview",
     "check": "node scripts/sync-taxonomy.mjs --check && node scripts/build-greenfield-migration.mjs --check && npm run worker:types:check && astro check && tsc --noEmit && tsc -p worker/tsconfig.json --noEmit && tsc -p worker/tests/tsconfig.json --noEmit",
     "greenfield:generate": "node scripts/build-greenfield-migration.mjs",
