@@ -9,23 +9,44 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Verify deployed Next-dev site
+        id: smoke
         shell: bash
         run: |
-          set -euo pipefail
+          set +e
           base='https://perkcommons-next-dev-final-cod-s-projects1.vercel.app'
-          ready=0
-          for attempt in $(seq 1 24); do
-            if curl -fsS --max-time 20 -D /tmp/headers -o /tmp/home "$base/"; then
-              ready=1
-              break
-            fi
-            sleep 10
-          done
-          test "$ready" = 1
-          grep -q 'Next experiment' /tmp/home
-          grep -q 'Open data. Evidence-led review.' /tmp/home
-          grep -qi "^content-security-policy: base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'" /tmp/headers
-          curl -fsS --max-time 20 "$base/opportunities/airtable-free-plan/" -o /tmp/detail
-          grep -q '<title>Free Plan — Airtable — PerkCommons</title>' /tmp/detail
-          curl -fsS --max-time 20 "$base/api/v1/opportunities?limit=1" -o /tmp/api
-          node -e "const p=JSON.parse(require('fs').readFileSync('/tmp/api','utf8')); if (!Array.isArray(p.items) || p.items.length !== 1) process.exit(1)"
+          mkdir -p smoke-artifacts
+          failures=0
+          : > smoke-artifacts/smoke.log
+
+          home_status=$(curl -sS --max-time 20 -D smoke-artifacts/home-headers.txt -o smoke-artifacts/home.html -w '%{http_code}' "$base/")
+          echo "home_status=$home_status" | tee -a smoke-artifacts/smoke.log
+          if [ "$home_status" != 200 ]; then echo 'FAIL homepage status' | tee -a smoke-artifacts/smoke.log; failures=$((failures+1)); fi
+          if grep -q 'Next experiment' smoke-artifacts/home.html; then echo 'PASS Next experiment marker' | tee -a smoke-artifacts/smoke.log; else echo 'FAIL Next experiment marker' | tee -a smoke-artifacts/smoke.log; failures=$((failures+1)); fi
+          if grep -q 'Open data. Evidence-led review.' smoke-artifacts/home.html; then echo 'PASS Next copy marker' | tee -a smoke-artifacts/smoke.log; else echo 'FAIL Next copy marker' | tee -a smoke-artifacts/smoke.log; failures=$((failures+1)); fi
+          if grep -qi "^content-security-policy: base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'" smoke-artifacts/home-headers.txt; then echo 'PASS enforced CSP' | tee -a smoke-artifacts/smoke.log; else echo 'FAIL enforced CSP' | tee -a smoke-artifacts/smoke.log; failures=$((failures+1)); fi
+
+          detail_status=$(curl -sS --max-time 20 -o smoke-artifacts/detail.html -w '%{http_code}' "$base/opportunities/airtable-free-plan/")
+          echo "detail_status=$detail_status" | tee -a smoke-artifacts/smoke.log
+          if [ "$detail_status" != 200 ]; then echo 'FAIL detail status' | tee -a smoke-artifacts/smoke.log; failures=$((failures+1)); fi
+          grep -o '<title>[^<]*</title>' smoke-artifacts/detail.html | head -1 | tee smoke-artifacts/detail-title.txt
+          if grep -q '<title>Free Plan — Airtable — PerkCommons</title>' smoke-artifacts/detail.html; then echo 'PASS unique detail title' | tee -a smoke-artifacts/smoke.log; else echo 'FAIL unique detail title' | tee -a smoke-artifacts/smoke.log; failures=$((failures+1)); fi
+
+          api_status=$(curl -sS --max-time 20 -o smoke-artifacts/api.json -w '%{http_code}' "$base/api/v1/opportunities?limit=1")
+          echo "api_status=$api_status" | tee -a smoke-artifacts/smoke.log
+          if [ "$api_status" != 200 ]; then echo 'FAIL API status' | tee -a smoke-artifacts/smoke.log; failures=$((failures+1)); else
+            node -e "const p=JSON.parse(require('fs').readFileSync('smoke-artifacts/api.json','utf8')); if (!Array.isArray(p.items) || p.items.length !== 1) process.exit(1)"
+            if [ $? -eq 0 ]; then echo 'PASS API one-item payload' | tee -a smoke-artifacts/smoke.log; else echo 'FAIL API one-item payload' | tee -a smoke-artifacts/smoke.log; failures=$((failures+1)); fi
+          fi
+
+          echo "failures=$failures" | tee -a smoke-artifacts/smoke.log
+          echo "failures=$failures" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload hosted smoke diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vercel-smoke-diagnostics
+          path: smoke-artifacts
+      - name: Fail if hosted smoke failed
+        if: steps.smoke.outputs.failures != '0'
+        run: exit 1
