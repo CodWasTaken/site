@@ -2,7 +2,7 @@ name: Site CI
 on:
   pull_request:
   push:
-    branches: [main, next/trust-foundation]
+    branches: [main]
 permissions:
   contents: read
 jobs:
@@ -24,23 +24,7 @@ jobs:
       - run: npm run build
         env:
           PERKCOMMONS_DATA_REPOSITORY_PATH: ${{ github.workspace }}/.data
-      - name: Diagnose generated H1 markup
-        run: node -e "const fs=require('node:fs'); const html=fs.readFileSync('dist/404.html','utf8'); const i=html.toLowerCase().indexOf('h1'); console.log({includesOpenH1:html.toLowerCase().includes('<h1'),index:i,snippet:i>=0?html.slice(Math.max(0,i-80),i+180):html.slice(0,300)});"
-      - name: Run site-quality audit
-        shell: bash
-        run: |
-          set -o pipefail
-          npm run audit:site 2>&1 | tee site-quality-audit.log
-      - name: Upload site-quality diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: site-quality-diagnostics
-          path: |
-            site-quality-audit.log
-            dist/404.html
-          if-no-files-found: warn
-          retention-days: 1
+      - run: npm run audit:site
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
         env:
