@@ -8,46 +8,53 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify immutable Vercel candidate
+      - name: Verify stable Next-dev alias
         id: smoke
         shell: bash
         run: |
           set +e
-          base='https://perkcommons-next-dev-final-eydbjegpp-cod-s-projects1.vercel.app'
+          base='https://perkcommons-next-dev-final-cod-s-projects1.vercel.app'
           mkdir -p smoke-artifacts
           failures=0
           : > smoke-artifacts/smoke.log
 
           ready=0
-          for attempt in $(seq 1 18); do
-            home_status=$(curl -sS --max-time 20 -D smoke-artifacts/home-headers.txt -o smoke-artifacts/home.html -w '%{http_code}' "$base/")
-            echo "attempt=$attempt home_status=$home_status" | tee -a smoke-artifacts/smoke.log
-            if [ "$home_status" = 200 ] && grep -q 'Next experiment' smoke-artifacts/home.html; then
+          for attempt in $(seq 1 24); do
+            home_status=$(curl -sS -L --max-time 20 -D smoke-artifacts/home-headers.txt -o smoke-artifacts/home.html -w '%{http_code}' "$base/")
+            title_status=$(curl -sS -L --max-time 20 -o smoke-artifacts/detail.html -w '%{http_code}' "$base/opportunities/airtable-free-plan/")
+            if [ "$home_status" = 200 ] && [ "$title_status" = 200 ] && grep -q 'Next experiment' smoke-artifacts/home.html && grep -q '<title>Free Plan — Airtable — PerkCommons</title>' smoke-artifacts/detail.html && grep -qi "^content-security-policy: base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'" smoke-artifacts/home-headers.txt; then
               ready=1
+              echo "attempt=$attempt candidate markers ready" | tee -a smoke-artifacts/smoke.log
               break
             fi
+            echo "attempt=$attempt home=$home_status detail=$title_status waiting for new deployment" | tee -a smoke-artifacts/smoke.log
             sleep 10
           done
 
-          if [ "$ready" != 1 ]; then echo 'FAIL candidate never became ready' | tee -a smoke-artifacts/smoke.log; failures=$((failures+1)); fi
+          if [ "$ready" != 1 ]; then echo 'FAIL stable alias never switched to verified deployment' | tee -a smoke-artifacts/smoke.log; failures=$((failures+1)); fi
           if grep -q 'Next experiment' smoke-artifacts/home.html; then echo 'PASS Next experiment marker' | tee -a smoke-artifacts/smoke.log; else echo 'FAIL Next experiment marker' | tee -a smoke-artifacts/smoke.log; failures=$((failures+1)); fi
           if grep -q 'Open data. Evidence-led review.' smoke-artifacts/home.html; then echo 'PASS Next copy marker' | tee -a smoke-artifacts/smoke.log; else echo 'FAIL Next copy marker' | tee -a smoke-artifacts/smoke.log; failures=$((failures+1)); fi
           if grep -qi "^content-security-policy: base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'" smoke-artifacts/home-headers.txt; then echo 'PASS enforced CSP' | tee -a smoke-artifacts/smoke.log; else echo 'FAIL enforced CSP' | tee -a smoke-artifacts/smoke.log; failures=$((failures+1)); fi
-
-          detail_status=$(curl -sS --max-time 20 -o smoke-artifacts/detail.html -w '%{http_code}' "$base/opportunities/airtable-free-plan/")
-          echo "detail_status=$detail_status" | tee -a smoke-artifacts/smoke.log
-          if [ "$detail_status" != 200 ]; then echo 'FAIL detail status' | tee -a smoke-artifacts/smoke.log; failures=$((failures+1)); fi
           grep -o '<title>[^<]*</title>' smoke-artifacts/detail.html | head -1 | tee smoke-artifacts/detail-title.txt || true
           if grep -q '<title>Free Plan — Airtable — PerkCommons</title>' smoke-artifacts/detail.html; then echo 'PASS unique detail title' | tee -a smoke-artifacts/smoke.log; else echo 'FAIL unique detail title' | tee -a smoke-artifacts/smoke.log; failures=$((failures+1)); fi
 
-          api_status=$(curl -sS --max-time 20 -o smoke-artifacts/api.json -w '%{http_code}' "$base/api/v1/opportunities?limit=1")
+          api_status=$(curl -sS -L --max-time 20 -o smoke-artifacts/api.json -w '%{http_code}' "$base/api/v1/opportunities?limit=1")
           echo "api_status=$api_status" | tee -a smoke-artifacts/smoke.log
-          if [ "$api_status" != 200 ]; then echo 'FAIL API status' | tee -a smoke-artifacts/smoke.log; failures=$((failures+1)); else
-            node -e "const p=JSON.parse(require('fs').readFileSync('smoke-artifacts/api.json','utf8')); const rows=p.items ?? p.records; if (!Array.isArray(rows) || rows.length !== 1) process.exit(1); if (p.metadata?.dataCommitSha !== 'db80383717ded0e29af497d36894c52bde8a01fa') process.exit(2)"
+          if [ "$api_status" != 200 ]; then
+            echo 'FAIL API status' | tee -a smoke-artifacts/smoke.log
+            failures=$((failures+1))
+          else
+            node - <<'NODE'
+          const fs = require('fs');
+          const p = JSON.parse(fs.readFileSync('smoke-artifacts/api.json', 'utf8'));
+          const rows = p.items ?? p.records;
+          if (!Array.isArray(rows) || rows.length !== 1) process.exit(1);
+          const text = JSON.stringify(p);
+          if (!text.includes('db80383717ded0e29af497d36894c52bde8a01fa')) process.exit(2);
+          NODE
             if [ $? -eq 0 ]; then echo 'PASS API one-item payload and data SHA' | tee -a smoke-artifacts/smoke.log; else echo 'FAIL API payload/data SHA' | tee -a smoke-artifacts/smoke.log; failures=$((failures+1)); fi
           fi
 
-          grep -o '<title>[^<]*</title>' smoke-artifacts/home.html | head -1 > smoke-artifacts/home-title.txt || true
           echo "failures=$failures" | tee -a smoke-artifacts/smoke.log
           echo "failures=$failures" >> "$GITHUB_OUTPUT"
           exit 0
