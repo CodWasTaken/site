@@ -4,37 +4,12 @@ on:
   push:
     branches: [main]
 permissions:
-  contents: write
+  contents: read
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
-      - name: Apply one-off unique opportunity title fix
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'next/trust-foundation'
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          path = Path('src/pages/opportunities/[id].astro')
-          old = '  title={`${listing.title} — PerkCommons`}'
-          new = '  title={`${listing.title} — ${listing.provider} — PerkCommons`}'
-          text = path.read_text()
-          if old in text:
-              path.write_text(text.replace(old, new, 1))
-          elif new not in text:
-              raise SystemExit('expected opportunity title template not found')
-          PY
-          if git diff --quiet -- 'src/pages/opportunities/[id].astro'; then
-            echo 'Opportunity title fix already applied.'
-          else
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add 'src/pages/opportunities/[id].astro'
-            git commit -m 'fix(next): make opportunity page titles unique'
-            git push origin HEAD:${{ github.event.pull_request.head.ref }}
-          fi
       - uses: actions/checkout@v4
         with:
           repository: CodWasTaken/data
@@ -49,24 +24,7 @@ jobs:
       - run: npm run build
         env:
           PERKCOMMONS_DATA_REPOSITORY_PATH: ${{ github.workspace }}/.data
-      - name: Run site audit
-        id: site_audit
-        run: |
-          set +e
-          npm run audit:site > site-audit.log 2>&1
-          status=$?
-          cat site-audit.log
-          echo "status=$status" >> "$GITHUB_OUTPUT"
-          exit 0
-      - name: Upload site audit diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: site-audit-diagnostics
-          path: site-audit.log
-      - name: Fail if site audit failed
-        if: steps.site_audit.outputs.status != '0'
-        run: exit 1
+      - run: npm run audit:site
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
         env:
