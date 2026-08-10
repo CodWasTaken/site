@@ -27,14 +27,21 @@ const installRuntimeCollectors = (page: Page) => {
 };
 
 const mockStaticPreviewWorkerDependencies = async (page: Page) => {
-  // Astro preview serves only the static build. Listing state is provided by the
-  // separate Worker in hosted environments, so give the local runtime sweep a
-  // neutral response rather than hiding arbitrary HTTP failures.
+  // Astro preview serves only the static build. These read-only public probes
+  // are provided by the separate Worker in hosted environments, so the local
+  // runtime sweep uses neutral responses without hiding arbitrary HTTP errors.
   await page.route("**/api/listings/state?*", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({ listings: [] }),
+    }),
+  );
+  await page.route("**/api/auth/me", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ moderator: null }),
     }),
   );
 };
