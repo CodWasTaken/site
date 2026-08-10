@@ -4,106 +4,78 @@
 
 **Goal:** Build a double-opt-in, category-based daily/weekly digest system with separate site-update consent, passwordless preference management, immediate unsubscribe/suppression, and authenticated outbound delivery through Resend.
 
-**Architecture:** Supabase stores subscriber state, preferences, consent events, hashed tokens, suppressions and send jobs. The existing Worker owns all mutation endpoints and scheduled digest execution. Astro serves static signup/confirm/manage pages that call same-origin Worker routes through the isolated deployment boundary. Raw tokens never persist server-side; raw email is minimized and durable suppression uses a keyed fingerprint.
+**Architecture:** Supabase stores subscriber state, preferences, consent events, hashed tokens, suppressions and idempotent send jobs. The existing Cloudflare Worker owns all newsletter mutations and scheduled delivery. Astro serves static signup/confirm/manage/unsubscribe pages. Raw tokens are never stored; durable suppression uses a keyed email fingerprint.
 
-**Tech Stack:** Astro, TypeScript, Cloudflare Worker scheduled handler, Supabase/PostgREST, Resend HTTPS API, Node tests, Playwright.
+**Tech Stack:** Astro 7, TypeScript 6, Cloudflare Worker + `wrangler.jsonc`, Supabase/PostgREST, Resend HTTPS API, Node tests, Playwright.
 
 ## Global Constraints
 
-- Sender: `PerkCommons <updates@perkcommons.com>`.
-- Reply-To: `hello@perkcommons.com`.
+- Work only in `CodWasTaken/site@next/foundation` paired with `CodWasTaken/data@next/schema-v2`.
+- Sender is `PerkCommons <updates@perkcommons.com>`; Reply-To is `hello@perkcommons.com`.
 - Double opt-in is mandatory.
-- Category digest and site updates are independent consent streams.
-- Digest frequency: user-selectable `daily` or `weekly`.
-- No subscriber account/password.
-- Manage/unsubscribe links use opaque high-entropy tokens; stored only as keyed hashes.
-- GET must never confirm a subscription or mutate preferences.
-- Unsubscribe from all must be available and prioritized for reliability.
-- Suppression survives profile deletion/reimport so accidental re-mailing cannot occur.
-- No paid subscription/billing work.
-- Resolve SPF/DKIM/DMARC and physical-address legal requirements before real promotional delivery.
+- Opportunity digest and site updates are independent consent streams.
+- Digest frequency is user-selectable `daily` or `weekly`.
+- No subscriber account or password.
+- Manage/unsubscribe links use opaque high-entropy tokens stored only as keyed hashes.
+- GET never confirms, updates, or unsubscribes.
+- Unsubscribe-all is always available and takes effect immediately.
+- Suppression survives profile deletion/reimport.
+- Raw IP addresses are not retained for newsletter consent evidence.
+- Do not enable real promotional delivery until SPF/DKIM/DMARC and the operator physical-address legal blocker are resolved.
+- Do not modify official `PerkCommons/*` repositories or production infrastructure.
 
 ---
 
 ## File Structure
 
-- `supabase/migrations/202608100002_newsletter.sql` — subscribers/preferences/consent/tokens/suppressions/send jobs with RLS.
-- `supabase/greenfield/00000000000000_perkcommons_fork.sql` — regenerated baseline.
-- `worker/lib/newsletter-types.ts` — newsletter domain types.
-- `worker/lib/newsletter-token.ts` — token generation/hash/verification purpose separation.
-- `worker/lib/newsletter-email.ts` — escaped HTML/text renderers and headers.
+- `supabase/migrations/202608100002_newsletter.sql` — newsletter schema/RLS/indexes.
+- `supabase/greenfield/00000000000000_perkcommons_fork.sql` — generated baseline.
+- `worker/lib/newsletter-types.ts` — newsletter types.
+- `worker/lib/newsletter-token.ts` — high-entropy token/HMAC helpers.
+- `worker/lib/newsletter-email.ts` — escaped HTML/text email templates.
 - `worker/lib/resend.ts` — minimal Resend API client.
-- `worker/lib/newsletter.ts` — subscriber state transitions and digest selection/idempotency.
-- `worker/routes/newsletter.ts` — signup/confirm/preferences/unsubscribe endpoints and Resend webhook.
-- `worker/index.ts` — route dispatch + scheduled digest reconciliation.
-- `worker/lib/types.ts` / `worker-configuration.d.ts` / Wrangler config — required secrets/config bindings.
-- `src/pages/newsletter/index.astro` — signup UI.
-- `src/pages/newsletter/confirm.astro` — scanner-safe confirmation page with explicit POST button.
-- `src/pages/newsletter/manage.astro` — passwordless preference UI.
-- `src/pages/newsletter/unsubscribe.astro` — explicit stream/all unsubscribe page.
-- `src/layouts/BaseLayout.astro` — newsletter entry point in footer.
-- `.env.example` / `.dev.vars.dev.example` — documented non-secret names only.
-- `tests/unit/newsletter-token.test.ts`
-- `tests/unit/newsletter-state.test.ts`
-- `tests/unit/newsletter-email.test.ts`
-- `worker/tests/newsletter.test.ts`
-- `tests/public-index.spec.ts`
+- `worker/lib/newsletter.ts` — state machine, cleanup and digest reconciliation.
+- `worker/routes/newsletter.ts` — public newsletter endpoints/webhook.
+- `worker/index.ts` — route dispatch and scheduled jobs.
+- `worker/lib/types.ts` — Worker environment bindings.
+- `worker/worker-configuration.d.ts` — generated Wrangler types.
+- `wrangler.jsonc` — isolated dev secrets, rates and cron.
+- `src/pages/newsletter/index.astro` — signup.
+- `src/pages/newsletter/confirm.astro` — explicit confirmation POST.
+- `src/pages/newsletter/manage.astro` — passwordless preferences.
+- `src/pages/newsletter/unsubscribe.astro` — stream/all unsubscribe.
+- `src/layouts/BaseLayout.astro` — newsletter footer entry.
+- `.env.example` / `.dev.vars.dev.example` — non-secret configuration names.
+- `tests/unit/newsletter-token.test.ts`, `newsletter-state.test.ts`, `newsletter-email.test.ts`.
+- `worker/tests/newsletter.test.ts` — Worker route tests.
+- `tests/public-index.spec.ts` — browser flows.
 
 ### Task 1: Add newsletter database schema
 
-**Files:**
-- Create: `supabase/migrations/202608100002_newsletter.sql`
-- Regenerate: `supabase/greenfield/00000000000000_perkcommons_fork.sql`
-- Modify: `tests/unit/migration-contract.test.ts`
-- Modify: `tests/unit/greenfield-migration.test.ts`
+**Files:** Create `supabase/migrations/202608100002_newsletter.sql`; regenerate greenfield baseline; modify migration tests.
 
 **Interfaces:**
 
-Tables:
-
 ```text
-newsletter_subscribers(id uuid pk, email citext/text unique, state pending|confirmed|unsubscribed, frequency daily|weekly, confirmed_at, last_digest_at, created_at, updated_at)
-newsletter_category_preferences(subscriber_id, category_id, active, updated_at; unique subscriber/category)
-newsletter_stream_preferences(subscriber_id, stream opportunity_digest|site_updates, active, updated_at; unique subscriber/stream)
-newsletter_consent_events(id, subscriber_id nullable, event_type, policy_version, wording_version, stream, occurred_at, request_country_code, request_ip_hash)
+newsletter_subscribers(id uuid pk, email text, state pending|confirmed|unsubscribed, frequency daily|weekly, confirmed_at, last_digest_at, created_at, updated_at)
+newsletter_category_preferences(subscriber_id, category_id, active, updated_at)
+newsletter_stream_preferences(subscriber_id, stream opportunity_digest|site_updates, active, updated_at)
+newsletter_consent_events(id, subscriber_id, event_type, policy_version, wording_version, stream, occurred_at, request_country_code, request_ip_hash)
 newsletter_tokens(id, subscriber_id, purpose confirm|manage|unsubscribe, token_hash unique, expires_at, used_at, created_at)
-newsletter_suppressions(email_hash pk, reason unsubscribe|bounce|complaint|admin, created_at, cleared_at nullable)
+newsletter_suppressions(email_hash pk, reason unsubscribe|bounce|complaint|admin, created_at, cleared_at)
 newsletter_send_jobs(id, subscriber_id, kind digest|site_update, period_key, idempotency_key unique, status pending|sending|sent|failed|suppressed, resend_id, attempts, last_error, created_at, sent_at)
 ```
 
-- [ ] **Step 1: Add failing schema assertions**
+- [ ] Write failing migration assertions for RLS, no anon/authenticated direct grants, unique email/suppression/idempotency constraints, token expiry/use fields, and due-send indexes.
+- [ ] Run `npx tsx --test tests/unit/migration-contract.test.ts`; expect failure because tables do not exist.
+- [ ] Write the migration using check constraints and `lower(email)` uniqueness; keep suppressions independent from subscriber cascade deletion.
+- [ ] Run `npm run greenfield:generate && npm run greenfield:check`.
+- [ ] Run migration/greenfield tests; expect pass.
+- [ ] Commit: `feat(newsletter): add consent and delivery schema`.
 
-Require RLS on every newsletter table, no anon/authenticated direct grants, unique email/suppression/idempotency constraints, token expiry/use fields, and indexes for confirmed/state/frequency/last_digest_at and pending send jobs.
+### Task 2: Add token and signup validation primitives
 
-- [ ] **Step 2: Run migration contract tests**
-
-Run: `npx tsx --test tests/unit/migration-contract.test.ts`
-Expected: FAIL because schema is absent.
-
-- [ ] **Step 3: Write migration**
-
-Use `lower(email)` unique index if `citext` is not already guaranteed. Add check constraints rather than new Postgres enums unless current schema conventions favor enums. Subscriber delete cascades preferences/tokens/jobs/consent events where legally appropriate, but suppression records are independent and keyed only by HMAC/hash.
-
-- [ ] **Step 4: Regenerate greenfield baseline**
-
-Run: `npm run greenfield:generate && npm run greenfield:check`.
-
-- [ ] **Step 5: Run tests and commit**
-
-```bash
-npx tsx --test tests/unit/migration-contract.test.ts tests/unit/greenfield-migration.test.ts
-git add supabase/migrations/202608100002_newsletter.sql supabase/greenfield/00000000000000_perkcommons_fork.sql tests/unit
-git commit -m "feat(newsletter): add consent and delivery schema"
-```
-
-### Task 2: Add token and request validation primitives
-
-**Files:**
-- Create: `worker/lib/newsletter-types.ts`
-- Create: `worker/lib/newsletter-token.ts`
-- Create: `tests/unit/newsletter-token.test.ts`
-- Modify: `worker/lib/validation.ts`
-- Modify: `worker/lib/types.ts`
+**Files:** Create `worker/lib/newsletter-types.ts`, `worker/lib/newsletter-token.ts`, `tests/unit/newsletter-token.test.ts`; modify validation/types.
 
 **Interfaces:**
 
@@ -116,37 +88,15 @@ export async function hashNewsletterToken(secret: string, purpose: TokenPurpose,
 export function validateNewsletterSignup(value: unknown): { email: string; categories: string[]; frequency: DigestFrequency; site_updates: boolean; consent_version: string; website: string; turnstile_token: string | null };
 ```
 
-- [ ] **Step 1: Write token tests**
+- [ ] Write failing tests for >=32-byte URL-safe entropy, deterministic purpose-separated HMAC, normalized email, category allowlist, daily/weekly only, site-updates-only signup, explicit consent version and honeypot.
+- [ ] Run focused tests; expect failure.
+- [ ] Generate tokens with Web Crypto `crypto.getRandomValues(new Uint8Array(32))`; base64url without padding. Hash HMAC-SHA-256 message `${purpose}:${raw}` using `NEWSLETTER_TOKEN_SECRET`. Never log raw tokens.
+- [ ] Run tests; expect pass.
+- [ ] Commit: `feat(newsletter): add token and signup contracts`.
 
-Assert 32-byte-or-stronger entropy, URL-safe raw value, deterministic keyed hash per raw+purpose, different hashes for same raw across purposes, and constant-shape invalid token handling.
+### Task 3: Implement escaped email rendering and Resend client
 
-- [ ] **Step 2: Write signup validation tests**
-
-Require valid normalized email, at least one category when opportunity digest is enabled, allow site-updates-only subscription, daily/weekly only, category allowlist, explicit consent version, honeypot and bounded payload.
-
-- [ ] **Step 3: Run tests and verify failure**
-
-Run: `npx tsx --test tests/unit/newsletter-token.test.ts tests/unit/validation.test.ts`
-Expected: FAIL.
-
-- [ ] **Step 4: Implement helpers**
-
-Generate raw token using Web Crypto `crypto.getRandomValues(new Uint8Array(32))`; base64url encode without padding. Hash with HMAC-SHA-256 using `NEWSLETTER_TOKEN_SECRET`, message `${purpose}:${raw}`. Never log raw token.
-
-- [ ] **Step 5: Run and commit**
-
-```bash
-npx tsx --test tests/unit/newsletter-token.test.ts tests/unit/validation.test.ts
-git add worker/lib/newsletter-types.ts worker/lib/newsletter-token.ts worker/lib/validation.ts worker/lib/types.ts tests/unit
-git commit -m "feat(newsletter): add token and signup contracts"
-```
-
-### Task 3: Implement escaped email rendering and minimal Resend client
-
-**Files:**
-- Create: `worker/lib/newsletter-email.ts`
-- Create: `worker/lib/resend.ts`
-- Create: `tests/unit/newsletter-email.test.ts`
+**Files:** Create `worker/lib/newsletter-email.ts`, `worker/lib/resend.ts`, `tests/unit/newsletter-email.test.ts`.
 
 **Interfaces:**
 
@@ -154,35 +104,18 @@ git commit -m "feat(newsletter): add token and signup contracts"
 export interface RenderedEmail { subject: string; html: string; text: string; headers: Record<string,string>; }
 export function renderConfirmationEmail(input: { confirmUrl: string }): RenderedEmail;
 export function renderDigestEmail(input: { manageUrl: string; unsubscribeUrl: string; opportunities: DigestOpportunity[]; periodLabel: string }): RenderedEmail;
-export function renderSiteUpdateEmail(...): RenderedEmail;
 export async function sendResendEmail(env: Env, message: RenderedEmail & { to: string; idempotencyKey: string }): Promise<{ id: string }>;
 ```
 
-- [ ] **Step 1: Write escaping/header tests**
-
-Use opportunity fields containing `<script>`, `&`, quotes and Unicode. Assert HTML contains escaped text, text version remains readable, URLs are HTTPS, and headers include `List-Unsubscribe` plus `List-Unsubscribe-Post: List-Unsubscribe=One-Click` for subscribed mail (not the initial confirmation email if the provider/client policy would make that misleading).
-
-- [ ] **Step 2: Verify current Resend API contract**
-
-Consult current official Resend docs only. Confirm endpoint, Authorization header, idempotency-header support, sender/reply-to fields, and webhook signature scheme before coding. Record any exact header names in tests/constants.
-
-- [ ] **Step 3: Implement renderer and client**
-
-Use a local `escapeHtml` helper with `& < > " '` escaping. Resend client sends JSON via `fetch`, redacts recipient/secret from logs, parses provider error body only into bounded non-sensitive error metadata, and throws typed transient/permanent failures by status class.
-
-- [ ] **Step 4: Run unit tests and commit**
-
-```bash
-npx tsx --test tests/unit/newsletter-email.test.ts
-git add worker/lib/newsletter-email.ts worker/lib/resend.ts tests/unit/newsletter-email.test.ts
-git commit -m "feat(newsletter): render and send compliant mail"
-```
+- [ ] Write failing tests with `<script>`, ampersands, quotes and Unicode in opportunity fields; assert HTML escaping, readable text, HTTPS links, and one-click unsubscribe headers on subscribed mail.
+- [ ] Verify the current Resend send endpoint, auth/idempotency headers, reply-to fields and webhook signature scheme from official Resend documentation only; encode exact names in constants/tests.
+- [ ] Implement local `escapeHtml` and the minimal fetch client. Provider logs may contain bounded status/error code but never recipient or secret.
+- [ ] Run unit tests; expect pass.
+- [ ] Commit: `feat(newsletter): render and send compliant mail`.
 
 ### Task 4: Implement subscriber state transitions
 
-**Files:**
-- Create: `worker/lib/newsletter.ts`
-- Create: `tests/unit/newsletter-state.test.ts`
+**Files:** Create `worker/lib/newsletter.ts`, `tests/unit/newsletter-state.test.ts`.
 
 **Interfaces:**
 
@@ -194,36 +127,15 @@ export async function updatePreferences(env: Env, rawManageToken: string, input:
 export async function unsubscribe(env: Env, rawToken: string, scope: "opportunity_digest"|"site_updates"|"all", signals: RequestSignals): Promise<void>;
 ```
 
-- [ ] **Step 1: Write state-machine tests with a fake Supabase adapter**
+- [ ] Write failing fake-adapter tests for fresh/repeated pending signup, token rotation, suppression behavior, confirmation consent events, purpose-bound one-time tokens, immediate preferences, stream unsubscribe, unsubscribe-all, and fresh-confirmation-required resubscribe.
+- [ ] Run test; expect failure.
+- [ ] Implement small PostgREST helpers and state transitions. Pending signup expiry is 7 days. Store keyed request fingerprint/country only, never raw IP.
+- [ ] Run tests; expect pass.
+- [ ] Commit: `feat(newsletter): implement consent state machine`.
 
-Cover fresh pending signup, repeated pending signup rotates confirmation token, suppression blocks silent reactivation, confirmation creates consent event and manage/unsubscribe tokens, token is one-time/purpose-bound, confirmed preference update is immediate, stream-specific unsubscribe, unsubscribe-all creates suppression, and re-subscribe from suppression requires a fresh explicit signup+confirmation flow that clears suppression only after confirmation.
+### Task 5: Add Worker routes and webhook
 
-- [ ] **Step 2: Verify failure**
-
-Run: `npx tsx --test tests/unit/newsletter-state.test.ts`
-Expected: FAIL.
-
-- [ ] **Step 3: Implement state transitions**
-
-Keep SQL/PostgREST calls in small private functions. Unconfirmed signup expiry is 7 days. Record consent wording/policy version on `confirmed` and stream opt-in/out events. Do not retain raw IP; use existing keyed fingerprint signal.
-
-- [ ] **Step 4: Run tests and commit**
-
-```bash
-npx tsx --test tests/unit/newsletter-state.test.ts
-git add worker/lib/newsletter.ts tests/unit/newsletter-state.test.ts
-git commit -m "feat(newsletter): implement consent state machine"
-```
-
-### Task 5: Add public newsletter Worker routes
-
-**Files:**
-- Create: `worker/routes/newsletter.ts`
-- Modify: `worker/index.ts`
-- Modify: `worker/lib/types.ts`
-- Modify: `worker/worker-configuration.d.ts` through `npm run worker:types`
-- Modify: `.dev.vars.dev.example`
-- Test: `worker/tests/newsletter.test.ts`
+**Files:** Create `worker/routes/newsletter.ts`, `worker/tests/newsletter.test.ts`; modify `worker/index.ts`, `worker/lib/types.ts`, `.dev.vars.dev.example`; regenerate `worker/worker-configuration.d.ts`.
 
 **Routes:**
 
@@ -236,158 +148,67 @@ POST /api/newsletter/unsubscribe
 POST /api/newsletter/webhooks/resend
 ```
 
-No state-changing GET route.
+- [ ] Write failing tests for method enforcement, body limits, generic non-enumerating signup response, Turnstile/rate limiting, invalid/expired token shape, immediate unsubscribe and no sensitive logs.
+- [ ] Implement route handlers using existing public error/security patterns.
+- [ ] Verify Resend webhook signatures exactly per current official docs; verified bounce/complaint events create/maintain suppression and suppress relevant send jobs; invalid signatures return 401; replay is idempotent by provider event id when supplied.
+- [ ] Add `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET`, `NEWSLETTER_TOKEN_SECRET` and `PUBLIC_SITE_ORIGIN` to `Env` and dev example names; no secret values in git.
+- [ ] Run `npm run worker:types && npx tsx --test worker/tests/*.test.ts`; expect pass.
+- [ ] Commit: `feat(newsletter): expose double opt in API`.
 
-- [ ] **Step 1: Add failing route tests**
+### Task 6: Add signup/confirm/manage/unsubscribe pages
 
-Assert methods, body size limits, generic non-enumerating signup response, Turnstile/rate limiting, no raw token/email logging, invalid/expired token generic response shapes, and immediate unsubscribe semantics.
+**Files:** Create four `src/pages/newsletter/*.astro` pages; modify BaseLayout and Playwright test.
 
-- [ ] **Step 2: Implement request handlers**
+- [ ] Write failing browser flow: signup requires one stream; categories use existing taxonomy; daily/weekly selectable; site updates independent; confirmation GET does not mutate; explicit Confirm POSTs; manage changes preferences; unsubscribe can disable one stream/all.
+- [ ] Implement pages with `BaseLayout noindex`. Confirmation/manage/unsubscribe are analytics-blocked. Use DOM `textContent` for status; never store email locally.
+- [ ] Token URL strategy: prefer fragment `#token=<raw>`, immediately remove it with `history.replaceState` after reading. If verified email-client behavior cannot preserve fragments, use an opaque query token with page-level `Referrer-Policy: no-referrer`, remove it before any other request, and never include email in URL.
+- [ ] Run `npx playwright test tests/public-index.spec.ts --grep "newsletter"`; expect pass.
+- [ ] Commit: `feat(newsletter): add passwordless subscription UI`.
 
-Reuse existing public-error shape but do not reveal whether an address is already subscribed/suppressed. Confirmation/preferences/unsubscribe can return explicit invalid-link messages because possession of a token is already required; do not reveal email in response.
+### Task 7: Implement digest selection and idempotent delivery
 
-- [ ] **Step 3: Implement Resend webhook verification**
+**Files:** Modify `worker/lib/newsletter.ts`, `worker/lib/newsletter-email.ts`, unit tests.
 
-Use only the current official Resend webhook verification contract from Task 3. On verified bounce/complaint events, create/maintain suppression and mark affected pending send jobs suppressed. Reject invalid signature with 401. Ensure replay handling is idempotent by provider event id if available.
-
-- [ ] **Step 4: Regenerate Worker types and run tests**
-
-Run: `npm run worker:types && npx tsx --test worker/tests/*.test.ts`.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add worker/routes/newsletter.ts worker/index.ts worker/lib/types.ts worker/worker-configuration.d.ts .dev.vars.dev.example worker/tests/newsletter.test.ts
-git commit -m "feat(newsletter): expose double opt in API"
-```
-
-### Task 6: Add static signup, confirm, manage and unsubscribe pages
-
-**Files:**
-- Create: `src/pages/newsletter/index.astro`
-- Create: `src/pages/newsletter/confirm.astro`
-- Create: `src/pages/newsletter/manage.astro`
-- Create: `src/pages/newsletter/unsubscribe.astro`
-- Modify: `src/layouts/BaseLayout.astro`
-- Test: `tests/public-index.spec.ts`
-
-**Interfaces:**
-- Links carry raw token in URL fragment, e.g. `/newsletter/confirm/#token=<raw>` where email clients preserve fragments; page JS reads fragment, removes it from visible URL with `history.replaceState`, and POSTs only after explicit user action.
-- If fragment preservation proves unreliable in supported email clients, fallback is a path/query opaque token with strict `Referrer-Policy: no-referrer` on these pages and immediate URL cleanup before any other request. Email is never in URL.
-
-- [ ] **Step 1: Add failing browser flow tests**
-
-Signup form requires email and at least one stream; category list from existing taxonomy; daily/weekly selection; site updates separate checkbox. Confirmation page GET does not mutate; clicking Confirm sends POST. Manage page can change categories/frequency/site updates. Unsubscribe page can disable one stream or all.
-
-- [ ] **Step 2: Implement pages**
-
-All pages use `BaseLayout noindex`; confirmation/manage/unsubscribe additionally set a prop/data flag consumed by analytics consent to guarantee no analytics. Use textContent for status. Store no email in localStorage.
-
-- [ ] **Step 3: Run browser tests and commit**
-
-```bash
-npx playwright test tests/public-index.spec.ts --grep "newsletter"
-git add src/pages/newsletter src/layouts/BaseLayout.astro tests/public-index.spec.ts
-git commit -m "feat(newsletter): add passwordless subscription UI"
-```
-
-### Task 7: Implement digest selection and idempotent send jobs
-
-**Files:**
-- Modify: `worker/lib/newsletter.ts`
-- Modify: `worker/lib/newsletter-email.ts`
-- Modify: `tests/unit/newsletter-state.test.ts`
-
-**Interfaces:**
+**Interface:**
 
 ```ts
 export async function reconcileNewsletterDigests(env: Env, now = new Date()): Promise<{ attempted: number; sent: number; failed: number; suppressed: number }>;
 ```
 
-- [ ] **Step 1: Add failing digest tests**
+- [ ] Write failing tests for daily/weekly windows, exact category match, zero-match no-send, independent site-update consent, deterministic period idempotency, retry and watermark advancement only after accepted send.
+- [ ] Read new-opportunity data through `env.ASSETS`. Use trustworthy publication/change timestamp data from generated assets; if unavailable, use `/data/changes.json`. Lack of trustworthy change metadata is a hard no-send condition.
+- [ ] Claim a unique send job before Resend; keep same idempotency key across retries; max transient attempts = 3; permanent bounce/complaint/suppression never loops.
+- [ ] Run state/email tests; expect pass.
+- [ ] Commit: `feat(newsletter): send idempotent category digests`.
 
-Fixtures include opportunities with published timestamp/category. Assert daily only selects since last successful daily boundary, weekly uses weekly boundary, zero-match sends nothing, category filtering is exact taxonomy ids, site-update opt-in independent, deterministic period idempotency key prevents duplicates, and watermark moves only after accepted send.
+### Task 8: Wire isolated Worker cron and cleanup
 
-- [ ] **Step 2: Implement opportunity source**
+**Files:** Modify `worker/index.ts`, `worker/lib/newsletter.ts`, `wrangler.jsonc`, `tests/unit/worker-config.test.ts`, `worker/tests/newsletter.test.ts`.
 
-Read the generated public opportunity dataset through `env.ASSETS` or existing catalogue helper rather than directly cloning GitHub at send time. Require a publication/update timestamp field; if current dataset cannot provide a reliable timestamp, use an explicit generated change feed (`/data/changes.json`) and make lack of trustworthy change metadata a hard no-send condition rather than guessing.
+- [ ] Write failing config test requiring the top-level non-dev cron to remain untouched and `env.dev.triggers.crons` to contain a newsletter-safe cadence no more frequent than hourly only when newsletter delivery is enabled. The current `env.dev.triggers.crons` is empty; this change is deliberate.
+- [ ] Implement cleanup for unconfirmed signups/tokens older than 7 days and expired tokens; do not delete suppressions as routine cleanup.
+- [ ] Extend scheduled handler with `Promise.allSettled([reconcilePublicationBatches, reconcileListingRemovals, reconcileNewsletterDigests, cleanupNewsletterState])` and distinct structured error event names.
+- [ ] Configure the isolated `env.dev` cron to `0 * * * *` once all newsletter tests pass. Do not change official/production Worker routing.
+- [ ] Run `npm run check && npx tsx --test worker/tests/*.test.ts`; expect pass.
+- [ ] Commit: `feat(newsletter): schedule digest reconciliation`.
 
-- [ ] **Step 3: Implement send job claim/send/finalize**
+### Task 9: Configure Vercel-to-Worker newsletter mutations
 
-Create a unique send job before contacting Resend. Mark `sending`, increment bounded attempts, call Resend with the same idempotency key, then set `sent` and update subscriber watermark in one logical completion path. Permanent provider errors suppress or fail without endless retries; transient failures retry on later cron up to the chosen bounded count (3).
+**Files:** Modify/create `vercel.json`, `.env.example`, `tests/unit/vercel-site-origin.test.ts`.
 
-- [ ] **Step 4: Run tests and commit**
-
-```bash
-npx tsx --test tests/unit/newsletter-state.test.ts tests/unit/newsletter-email.test.ts
-git add worker/lib/newsletter.ts worker/lib/newsletter-email.ts tests/unit
-git commit -m "feat(newsletter): send idempotent category digests"
-```
-
-### Task 8: Wire scheduled delivery and cleanup
-
-**Files:**
-- Modify: `worker/index.ts`
-- Modify: Worker configuration (`wrangler.toml` or existing config file discovered in repo)
-- Test: `tests/unit/worker-config.test.ts`
-- Test: `worker/tests/newsletter.test.ts`
-
-- [ ] **Step 1: Add failing cron/config test**
-
-Require isolated dev cron no more frequent than hourly, and ensure scheduled handler calls publication reconciliation, removal reconciliation, newsletter reconciliation, and pending-signup/token cleanup independently via `Promise.allSettled` so one failure does not skip the others.
-
-- [ ] **Step 2: Implement cleanup function**
-
-Delete pending unconfirmed signup/token rows older than 7 days; invalidate expired tokens; retain suppressions and consent events according to schema/legal retention policy.
-
-- [ ] **Step 3: Wire scheduled handler**
-
-Add newsletter jobs to the existing scheduled handler with distinct structured error event names. Do not add cron to production/official Worker config; only the isolated Next environment gets the schedule.
-
-- [ ] **Step 4: Run tests and commit**
-
-```bash
-npm run check && npx tsx --test worker/tests/*.test.ts
-git add worker/index.ts worker/lib/newsletter.ts wrangler.toml tests/unit/worker-config.test.ts worker/tests/newsletter.test.ts
-git commit -m "feat(newsletter): schedule digest reconciliation"
-```
-
-### Task 9: Configure Vercel-to-Worker mutation boundary
-
-**Files:**
-- Modify: `vercel.json`
-- Modify: `.env.example`
-- Test: `tests/unit/vercel-site-origin.test.ts`
-
-- [ ] **Step 1: Add failing rewrite test**
-
-Require only mutation/private prefixes that actually live on Worker to be rewritten/proxied; static generated `/api/v1/*` remains served by the Vercel artifact unless current deployment architecture already routes all `/api/*` through Worker. Explicitly test no catch-all rewrite.
-
-- [ ] **Step 2: Implement narrow routing**
-
-Use an environment-configured isolated Worker origin. Never hardcode production `perkcommons.com` or official Worker route. Preserve same-origin browser URLs so confirmation/manage calls do not leak tokens via cross-origin navigation.
-
-- [ ] **Step 3: Run config tests and build**
-
-Run: `npx tsx --test tests/unit/vercel-site-origin.test.ts && npm run build`.
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add vercel.json .env.example tests/unit/vercel-site-origin.test.ts
-git commit -m "fix(deploy): route newsletter mutations to isolated worker"
-```
+- [ ] Write failing config test requiring only newsletter mutation paths (and any already-required existing private mutation prefixes) to target the isolated Worker origin; generated `/api/v1/*` remains static on Vercel. No catch-all proxy.
+- [ ] Add environment-configured isolated Worker origin; never hardcode production `perkcommons.com` or official Worker URLs.
+- [ ] Preserve same-origin browser calls for token-bearing POST bodies.
+- [ ] Run Vercel config test and build; expect pass.
+- [ ] Commit: `fix(deploy): route newsletter mutations to isolated worker`.
 
 ### Task 10: Full newsletter verification
 
-- [ ] Verify current official Resend docs before final secrets/headers/webhook settings.
-- [ ] `npm run check`
-- [ ] `npm test`
-- [ ] `npm run build && npm run audit:site`
-- [ ] `npm run test:browser`
-- [ ] Run Worker tests with mocked Resend and disposable Supabase fixtures.
-- [ ] In isolated dev only, send one confirmation and one digest through a verified Resend test/domain setup after SPF/DKIM/DMARC are configured.
-- [ ] Confirm link-scanner GET cannot confirm/unsubscribe.
-- [ ] Confirm unsubscribe-all prevents future send selection even if subscriber profile is later recreated without a new confirmation.
-- [ ] Confirm no raw token, raw IP, or private email appears in logs, public pages, URLs after cleanup, or public GitHub data.
-- [ ] Do not enable real promotional/site-update delivery until the required operator physical-address/legal disclosure is resolved.
+- [ ] Re-check current official Resend docs immediately before final webhook/send configuration.
+- [ ] Run `npm run check`, `npm test`, `npm run build && npm run audit:site`, and `npm run test:browser`.
+- [ ] Verify Worker tests with mocked Resend and disposable Supabase fixtures.
+- [ ] In isolated dev only, after SPF/DKIM/DMARC are configured, send one confirmation and one digest using a verified Resend test/domain setup.
+- [ ] Confirm link-scanner GET cannot confirm or unsubscribe.
+- [ ] Confirm unsubscribe-all prevents future send selection unless a new explicit signup and confirmation occurs.
+- [ ] Confirm raw token, raw IP, and private subscriber email are absent from logs/public GitHub data/public URLs after token cleanup.
+- [ ] Keep real site-update/promotional delivery disabled until the physical-address legal disclosure is resolved.
