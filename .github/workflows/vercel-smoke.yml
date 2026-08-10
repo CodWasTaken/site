@@ -13,7 +13,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          base='https://perkcommons-next-dev-final-p1qmgezvl-cod-s-projects1.vercel.app'
+          base='https://perkcommons-next-dev-final-eydbjegpp-cod-s-projects1.vercel.app'
           mkdir -p smoke-artifacts
           failures=0
           : > smoke-artifacts/smoke.log
