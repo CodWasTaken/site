@@ -8,23 +8,25 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Probe static and build canaries
+      - name: Probe production build canary
         shell: bash
         run: |
           set -euo pipefail
           mkdir probe
           for pair in \
-            'static https://perkcommons-deploy-canary-33lndxr88-cod-s-projects1.vercel.app/' \
-            'build https://perkcommons-build-canary-8x0utqbjz-cod-s-projects1.vercel.app/'
+            'stable https://perkcommons-build-canary-cod-s-projects1.vercel.app/' \
+            'immutable https://perkcommons-build-canary-lbv1w1zq8-cod-s-projects1.vercel.app/'
           do
             set -- $pair
             name=$1
             url=$2
-            status=$(curl -sS --max-time 20 -D "probe/$name.headers" -o "probe/$name.html" -w '%{http_code}' "$url")
+            status=$(curl -sS -L --max-time 20 -D "probe/$name.headers" -o "probe/$name.html" -w '%{http_code}' "$url")
             printf '%s=%s\n' "$name" "$status" | tee -a probe/result.txt
             grep -o '<title>[^<]*</title>' "probe/$name.html" | head -1 | tee -a probe/result.txt || true
           done
+          grep -q '<title>Build canary ready</title>' probe/stable.html
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: vercel-canary-probe
           path: probe
