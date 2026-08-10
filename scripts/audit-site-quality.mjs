@@ -39,7 +39,8 @@ const inspectHtml = (path, html, errors) => {
   }
 
   const titles = [...html.matchAll(/<title\b[^>]*>([\s\S]*?)<\/title>/gi)];
-  if (titles.length !== 1 || !titles[0]?.[1]?.trim()) {
+  const title = titles.length === 1 ? titles[0]?.[1]?.trim() : "";
+  if (!title) {
     errors.push(`${route}: expected exactly one non-empty title`);
   }
 
@@ -64,6 +65,14 @@ const inspectHtml = (path, html, errors) => {
   if (!/<main\b/i.test(html) || !/<body\b[^>]*>[\s\S]*\S[\s\S]*<\/body>/i.test(html)) {
     errors.push(`${route}: generated HTML shell is empty or missing main content`);
   }
+
+  for (const image of html.matchAll(/<img\b[^>]*>/gi)) {
+    if (!/\balt\s*=/i.test(image[0])) {
+      errors.push(`${route}: img element is missing an alt attribute`);
+    }
+  }
+
+  return title || null;
 };
 
 const requireFile = (root, name, errors) => {
@@ -76,7 +85,7 @@ export const auditDist = async (root, options = {}) => {
   const distRoot = resolve(root);
   const errors = [];
   const files = await walkFiles(distRoot);
-  const jsFiles = files.filter((path) => extname(path).toLowerCase() === ".js");
+  const pageTitles = new Map();
   let jsBytes = 0;
   let largestJsBytes = 0;
 
@@ -91,7 +100,17 @@ export const auditDist = async (root, options = {}) => {
       largestJsBytes = Math.max(largestJsBytes, bytes);
     }
     if (extension === ".html") {
-      inspectHtml(path, await readFile(path, "utf8"), errors);
+      const title = inspectHtml(path, await readFile(path, "utf8"), errors);
+      if (title) {
+        const normalizedTitle = title.replace(/\s+/g, " ").trim().toLowerCase();
+        const route = relative(distRoot, path).replaceAll("\\", "/");
+        const firstRoute = pageTitles.get(normalizedTitle);
+        if (firstRoute) {
+          errors.push(`${route}: duplicate page title "${title}" also used by ${firstRoute}`);
+        } else {
+          pageTitles.set(normalizedTitle, route);
+        }
+      }
     }
   }
 
