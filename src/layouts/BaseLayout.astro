@@ -1,10 +1,13 @@
 ---
 import { Github, Menu, Moon, ShieldCheck, Sun, X } from "lucide-astro";
+import { baseStructuredData, canonicalUrl, safeJsonLd } from "../lib/seo";
 import "../styles/global.css";
 
 interface Props { title: string; description: string; noindex?: boolean; }
 const { title, description, noindex = false } = Astro.props;
-const canonical = new URL(Astro.url.pathname, Astro.site);
+const canonical = canonicalUrl(Astro.site!, Astro.url.pathname);
+const socialImage = new URL("/brand/social-card.png", Astro.site!);
+const structuredData = baseStructuredData(Astro.site!);
 ---
 <!doctype html>
 <html lang="en">
@@ -38,14 +41,12 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <meta property="og:type" content="website" />
     <meta property="og:url" content={canonical} />
     <meta property="og:site_name" content="PerkCommons" />
-    <meta property="og:image" content={new URL("/brand/wordmark.svg", Astro.site)} />
-    <meta name="twitter:card" content="summary" />
+    <meta property="og:image" content={socialImage} />
+    <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
-    <script is:inline type="application/ld+json" set:html={JSON.stringify([
-      { "@context": "https://schema.org", "@type": "Organization", name: "PerkCommons", url: "https://perkcommons.com", logo: "https://perkcommons.com/brand/mark.svg" },
-      { "@context": "https://schema.org", "@type": "WebSite", name: "PerkCommons", url: "https://perkcommons.com", potentialAction: { "@type": "SearchAction", target: "https://perkcommons.com/opportunities/?q={search_term_string}", "query-input": "required name=search_term_string" } },
-    ])} />
+    <meta name="twitter:image" content={socialImage} />
+    <script is:inline type="application/ld+json" set:html={safeJsonLd(structuredData)} />
     <title>{title}</title>
     <slot name="head" />
   </head>
