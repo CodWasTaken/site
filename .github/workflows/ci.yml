@@ -24,6 +24,7 @@ jobs:
       - run: npm run build
         env:
           PERKCOMMONS_DATA_REPOSITORY_PATH: ${{ github.workspace }}/.data
+      - run: npm run audit:site
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
         env:

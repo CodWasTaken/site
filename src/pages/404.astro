@@ -1,0 +1,24 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  title="Page not found — PerkCommons"
+  description="The requested PerkCommons page could not be found. Browse the opportunity index or explore categories instead."
+  noindex
+>
+  <section class="container py-20 sm:py-28">
+    <div class="max-w-2xl">
+      <p class="text-sm font-semibold text-brand">404</p>
+      <h1 class="mt-2 text-4xl font-semibold leading-tight">That page isn’t here.</h1>
+      <p class="mt-5 max-w-xl text-lg leading-8 text-muted">
+        The address may have changed, or the page may no longer exist. The opportunity catalogue and category index are still available.
+      </p>
+      <div class="mt-8 flex flex-wrap gap-3">
+        <a href="/opportunities/" class="inline-flex min-h-12 items-center rounded-md bg-action px-5 font-medium text-white hover:bg-action-hover">Browse opportunities</a>
+        <a href="/categories/" class="inline-flex min-h-12 items-center rounded-md border border-line bg-surface px-5 font-medium text-ink hover:border-brand">Explore categories</a>
+        <a href="/" class="inline-flex min-h-12 items-center px-2 font-medium">Return home</a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

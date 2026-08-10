@@ -70,6 +70,24 @@ test("submission validation rejects unsafe URLs and unknown categories", () => {
   assert.throws(() => safeHttpsUrl("http://example.org", "Source"));
 });
 
+test("safeHttpsUrl rejects executable, data, credentialed, and malformed encoded schemes", () => {
+  for (const candidate of [
+    "javascript:alert(1)",
+    "data:text/html,<script>alert(1)</script>",
+    "https://user:password@example.org/path",
+    "java%73cript:alert(1)",
+  ]) {
+    assert.throws(() => safeHttpsUrl(candidate, "Source"), candidate);
+  }
+});
+
+test("submission validation preserves HTML-shaped text as literal data", () => {
+  const description =
+    "Funding details remain literal even with <script>alert('xss')</script> shaped text.";
+  const result = validateSubmission({ ...validSubmission, description });
+  assert.equal(result.description, description);
+});
+
 test("email and country normalization handle malformed values", () => {
   assert.equal(normalizeEmail(" Person@Example.org "), "person@example.org");
   assert.throws(() => normalizeEmail("not-an-email"));

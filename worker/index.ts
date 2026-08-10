@@ -1,5 +1,5 @@
 import { requireModerator } from "./lib/auth";
-import { apiError, json, methodNotAllowed, withSecurityHeaders } from "./lib/http";
+import { apiError, json, methodNotAllowed, RequestError, withSecurityHeaders } from "./lib/http";
 import type { Env } from "./lib/types";
 import { reconcilePublicationBatches } from "./lib/publication";
 import { reconcileListingRemovals } from "./lib/removal";
@@ -201,6 +201,12 @@ async function api(request: Request, env: Env): Promise<Response> {
       },
     );
   } catch (error) {
+    if (
+      path === "/api/auth/me" &&
+      error instanceof RequestError &&
+      error.status === 401
+    )
+      return json({ moderator: null });
     return path === "/api/submissions" || path === "/api/reports"
       ? handlePublicError(error)
       : moderationError(error);
