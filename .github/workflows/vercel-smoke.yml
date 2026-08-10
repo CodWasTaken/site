@@ -1,0 +1,31 @@
+name: Vercel Smoke
+on:
+  push:
+    branches: [next/trust-foundation]
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify deployed Next-dev site
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://perkcommons-next-dev-final-cod-s-projects1.vercel.app'
+          ready=0
+          for attempt in $(seq 1 24); do
+            if curl -fsS --max-time 20 -D /tmp/headers -o /tmp/home "$base/"; then
+              ready=1
+              break
+            fi
+            sleep 10
+          done
+          test "$ready" = 1
+          grep -q 'Next experiment' /tmp/home
+          grep -q 'Open data. Evidence-led review.' /tmp/home
+          grep -qi "^content-security-policy: base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'" /tmp/headers
+          curl -fsS --max-time 20 "$base/opportunities/airtable-free-plan/" -o /tmp/detail
+          grep -q '<title>Free Plan — Airtable — PerkCommons</title>' /tmp/detail
+          curl -fsS --max-time 20 "$base/api/v1/opportunities?limit=1" -o /tmp/api
+          node -e "const p=JSON.parse(require('fs').readFileSync('/tmp/api','utf8')); if (!Array.isArray(p.items) || p.items.length !== 1) process.exit(1)"
