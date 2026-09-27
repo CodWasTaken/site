@@ -105,7 +105,8 @@ export const startPublicationBatch = async (
       503,
       "publication_not_configured",
     );
-  const target = githubTargetConfig(env);\n  const batchId = await callRpc<string | null>(env, "begin_publication_batch", {
+  const target = githubTargetConfig(env);
+  const batchId = await callRpc<string | null>(env, "begin_publication_batch", {
     p_moderator_id: moderator.userId,
   });
   if (!batchId) return null;
