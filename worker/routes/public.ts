@@ -8,13 +8,17 @@ import { validateReport, validateSubmission } from "../lib/validation";
 
 const genericSuccess = () => json({ message: "Submitted for review." }, 201);
 
-const publicListingExists = async (env: Env, listingId: string): Promise<boolean> => {
+const publicListingExists = async (
+  env: Env,
+  listingId: string,
+  requestUrl: string,
+): Promise<boolean> => {
   if (env.TOMBSTONE_STORE && await env.TOMBSTONE_STORE.get(listingId) !== null)
     return true;
   const manifestUrl = new URL("/listing-manifest.json", "https://perkcommons.invalid");
   const response = env.ASSETS
     ? await env.ASSETS.fetch(new Request(manifestUrl))
-    : await fetch(new URL("/listing-manifest.json", "https://perkcommons.com"));
+    : await fetch(new URL("/listing-manifest.json", requestUrl));
   if (!response.ok)
     throw new RequestError(
       "Listing validation is temporarily unavailable.",
@@ -229,7 +233,7 @@ export async function handlePublicReport(
     throw new RequestError("Report protection is misconfigured.", 503, "configuration_error");
   const input = validateReport(await readJson(request, 12_000));
   if (input.website) return genericSuccess();
-  if (!(await publicListingExists(env, input.listing_id)))
+  if (!(await publicListingExists(env, input.listing_id, request.url)))
     throw new RequestError(
       "This listing does not exist in the public catalogue.",
       404,
