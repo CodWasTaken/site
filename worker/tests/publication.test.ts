@@ -49,6 +49,11 @@ const env = {
   SUBMISSION_FINGERPRINT_SECRET: "fingerprint-secret",
   GITHUB_DATA_PUBLICATION_TOKEN: "data-publication-token",
   GITHUB_SITE_DEPLOY_TOKEN: "site-deploy-token",
+  GITHUB_DATA_REPOSITORY: "CodWasTaken/data",
+  GITHUB_DATA_BRANCH: "main",
+  GITHUB_HEAD_OWNER: "CodWasTaken",
+  GITHUB_SITE_REPOSITORY: "CodWasTaken/site",
+  FORK_ONLY_MODE: "true",
 } satisfies Env;
 
 const administrator: Moderator = {
@@ -181,7 +186,7 @@ test("starting a publication batch creates one data PR with every claimed item",
       return Response.json(
         {
           number: 12,
-          html_url: "https://github.com/PerkCommons/data/pull/12",
+          html_url: "https://github.com/CodWasTaken/data/pull/12",
           state: "open",
           merged: false,
           merged_at: null,
@@ -231,7 +236,7 @@ test("an active publication batch is returned without rewriting its data branch"
           item_count: 2,
           github_branch: "publication-33333333-3333-4333-8333-333333333333",
           github_pr_number: 12,
-          github_pr_url: "https://github.com/PerkCommons/data/pull/12",
+          github_pr_url: "https://github.com/CodWasTaken/data/pull/12",
           github_head_sha: "new-commit",
           github_merge_sha: null,
           last_error_code: null,
@@ -268,7 +273,7 @@ test("reconciliation merges only after validation and then requests deployment",
           item_count: 1,
           github_branch: "publication-33333333-3333-4333-8333-333333333333",
           github_pr_number: 12,
-          github_pr_url: "https://github.com/PerkCommons/data/pull/12",
+          github_pr_url: "https://github.com/CodWasTaken/data/pull/12",
           github_head_sha: "new-commit",
           github_merge_sha: null,
           last_error_code: null,
@@ -280,7 +285,7 @@ test("reconciliation merges only after validation and then requests deployment",
     if (url.endsWith("/pulls/12") && method === "GET")
       return Response.json({
         number: 12,
-        html_url: "https://github.com/PerkCommons/data/pull/12",
+        html_url: "https://github.com/CodWasTaken/data/pull/12",
         state: "open",
         merged: false,
         merged_at: null,
