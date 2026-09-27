@@ -1,3 +1,5 @@
+import { requestSiteDeployment, siteDeploymentConfigured } from "./deployment";
+import { githubTargetConfig } from "./github-targets";
 import {
   createRemovalPullRequest,
   dispatchSiteDeployment,
@@ -61,7 +63,7 @@ const finalizeBatch = async (
     p_batch_id: batch.id,
     p_merge_sha: mergeSha,
   });
-  await requestSiteDeployment(env, batch.id);
+  await requestSiteRebuild(env, batch.id);
 };
 
 const prepareBatch = async (
@@ -171,7 +173,7 @@ const reconcileBatch = async (env: Env, batch: ListingRemovalBatch) => {
 };
 
 export const reconcileListingRemovals = async (env: Env): Promise<void> => {
-  if (!env.GITHUB_DATA_PUBLICATION_TOKEN || !env.GITHUB_SITE_DEPLOY_TOKEN) return;
+  if (!env.GITHUB_DATA_PUBLICATION_TOKEN || !siteDeploymentConfigured(env)) return;
   const { data: active } = await supabaseRequest<ListingRemovalBatch[]>(
     env,
     `/rest/v1/listing_removal_batches?status=in.(preparing,validating,merging)&select=${batchFields}&order=created_at.asc&limit=10`,
@@ -197,7 +199,7 @@ export const reconcileListingRemovals = async (env: Env): Promise<void> => {
   );
   for (const batch of awaitingDeployment) {
     try {
-      await requestSiteDeployment(env, batch.id);
+      await requestSiteRebuild(env, batch.id);
     } catch (error) {
       console.error(
         JSON.stringify({
