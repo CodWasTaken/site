@@ -1,17 +1,10 @@
-import {
-  keyedFingerprint,
-  normalizeIpAddress,
-  normalizeUserAgent,
-} from "../lib/fingerprints";
+import { keyedFingerprint, normalizeUserAgent } from "../lib/fingerprints";
 import { apiError, json, readJson, RequestError } from "../lib/http";
 import { strongestBanMode } from "../lib/moderation-policy";
+import { requestClientIp, requestCountry } from "../lib/request-metadata";
 import { insertRows, supabaseRequest } from "../lib/supabase";
 import type { Env } from "../lib/types";
-import {
-  normalizeCountryCode,
-  validateReport,
-  validateSubmission,
-} from "../lib/validation";
+import { validateReport, validateSubmission } from "../lib/validation";
 
 const genericSuccess = () => json({ message: "Submitted for review." }, 201);
 
@@ -19,7 +12,9 @@ const publicListingExists = async (env: Env, listingId: string): Promise<boolean
   if (env.TOMBSTONE_STORE && await env.TOMBSTONE_STORE.get(listingId) !== null)
     return true;
   const manifestUrl = new URL("/listing-manifest.json", "https://perkcommons.invalid");
-  const response = await env.ASSETS.fetch(new Request(manifestUrl));
+  const response = env.ASSETS
+    ? await env.ASSETS.fetch(new Request(manifestUrl))
+    : await fetch(new URL("/listing-manifest.json", "https://perkcommons.com"));
   if (!response.ok)
     throw new RequestError(
       "Listing validation is temporarily unavailable.",
@@ -126,10 +121,8 @@ const requestSignals = async (
   env: Env,
   email: string | null,
 ) => {
-  const rawIp = normalizeIpAddress(
-    request.headers.get("CF-Connecting-IP") ?? "",
-  );
-  const country = normalizeCountryCode(request.cf?.country);
+  const rawIp = requestClientIp(request);
+  const country = requestCountry(request);
   const emailHash = await keyedFingerprint(
     env.SUBMISSION_FINGERPRINT_SECRET,
     "email",
