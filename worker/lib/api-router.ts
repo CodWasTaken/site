@@ -66,7 +66,7 @@ async function publicCatalogApi(
       "catalogue_unavailable",
     );
 
-  const payload = await response.json<Record<string, unknown>>();
+  const payload = (await response.json()) as Record<string, unknown>;
   if (url.pathname !== "/api/v1/opportunities") return json(payload);
 
   const all = Array.isArray(payload.records) ? payload.records : [];
