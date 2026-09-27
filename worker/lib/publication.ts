@@ -1,3 +1,5 @@
+import { requestSiteDeployment, siteDeploymentConfigured } from "./deployment";
+import { githubTargetConfig } from "./github-targets";
 import { RequestError } from "./http";
 import {
   publicationListingId,
@@ -97,13 +99,13 @@ export const startPublicationBatch = async (
   env: Env,
   moderator: Moderator,
 ): Promise<PublicationBatch | null> => {
-  if (!env.GITHUB_DATA_PUBLICATION_TOKEN || !env.GITHUB_SITE_DEPLOY_TOKEN)
+  if (!env.GITHUB_DATA_PUBLICATION_TOKEN || !siteDeploymentConfigured(env))
     throw new RequestError(
       "Automated publication is not configured.",
       503,
       "publication_not_configured",
     );
-  const batchId = await callRpc<string | null>(env, "begin_publication_batch", {
+  const target = githubTargetConfig(env);\n  const batchId = await callRpc<string | null>(env, "begin_publication_batch", {
     p_moderator_id: moderator.userId,
   });
   if (!batchId) return null;
@@ -190,7 +192,7 @@ const finalizeBatch = async (
     p_batch_id: batch.id,
     p_merge_sha: mergeSha,
   });
-  await requestSiteDeployment(env, batch.id);
+  await requestSiteRebuild(env, batch.id);
 };
 
 const reconcileBatch = async (env: Env, batch: PublicationBatch) => {
@@ -270,7 +272,7 @@ export const reconcilePublicationBatches = async (env: Env): Promise<void> => {
   );
   for (const batch of awaitingDeployment) {
     try {
-      await requestSiteDeployment(env, batch.id);
+      await requestSiteRebuild(env, batch.id);
     } catch (error) {
       console.error(
         JSON.stringify({
