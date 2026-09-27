@@ -18,6 +18,11 @@ const listing = (overrides: Partial<Listing> = {}): Listing => ({
   submissionType: "maintainer",
   sponsor: false,
   reviewDate: "2026-07-23",
+  reviewMethod: null,
+  reviewState: null,
+  reviewerReference: null,
+  editorialReviewState: "legacy-source-checked",
+  verified: false,
   ...overrides,
 });
 
