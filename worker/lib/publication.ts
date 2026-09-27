@@ -9,7 +9,6 @@ import {
 } from "./publication-data";
 import {
   createPublicationPullRequest,
-  dispatchSiteDeployment,
   getPublicationChecks,
   getPublicationPullRequest,
   mergePublicationPullRequest,
@@ -132,6 +131,7 @@ export const startPublicationBatch = async (
   try {
     const pullRequest = await createPublicationPullRequest(
       env.GITHUB_DATA_PUBLICATION_TOKEN,
+      target,
       batchId,
       opportunities,
     );
@@ -177,8 +177,8 @@ export const publicationBatchStatus = async (
   };
 };
 
-const requestSiteDeployment = async (env: Env, batchId: string) => {
-  await dispatchSiteDeployment(env.GITHUB_SITE_DEPLOY_TOKEN);
+const requestSiteRebuild = async (env: Env, batchId: string) => {
+  await requestSiteDeployment(env);
   await updateBatch(env, batchId, {
     deployment_requested_at: new Date().toISOString(),
   });
@@ -198,8 +198,10 @@ const finalizeBatch = async (
 
 const reconcileBatch = async (env: Env, batch: PublicationBatch) => {
   if (!batch.github_pr_number) return;
+  const target = githubTargetConfig(env);
   const pullRequest = await getPublicationPullRequest(
     env.GITHUB_DATA_PUBLICATION_TOKEN,
+    target,
     batch.github_pr_number,
   );
   if (!pullRequest) return;
@@ -222,6 +224,7 @@ const reconcileBatch = async (env: Env, batch: PublicationBatch) => {
     await updateBatch(env, batch.id, { github_head_sha: pullRequest.head.sha });
   const checks = await getPublicationChecks(
     env.GITHUB_DATA_PUBLICATION_TOKEN,
+    target,
     pullRequest.head.sha,
   );
   const validation = checks.find((check) => check.name === "validate");
@@ -236,6 +239,7 @@ const reconcileBatch = async (env: Env, batch: PublicationBatch) => {
   });
   const merge = await mergePublicationPullRequest(
     env.GITHUB_DATA_PUBLICATION_TOKEN,
+    target,
     batch.github_pr_number,
     pullRequest.head.sha,
     batch.item_count,
