@@ -14,13 +14,13 @@ interface TombstoneStore {
 }
 
 export interface Env {
-  ASSETS: { fetch(request: Request): Promise<Response> };
+  ASSETS?: { fetch(request: Request): Promise<Response> };
   SUPABASE_URL: string;
   SUPABASE_PUBLISHABLE_KEY: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
   SUBMISSION_FINGERPRINT_SECRET: string;
   GITHUB_DATA_PUBLICATION_TOKEN?: string;
-  GITHUB_SITE_DEPLOY_TOKEN?: string;
+  GITHUB_SITE_DEPLOY_TOKEN?: string;\n  GITHUB_DATA_REPOSITORY?: string;\n  GITHUB_DATA_BRANCH?: string;\n  GITHUB_HEAD_OWNER?: string;\n  GITHUB_SITE_REPOSITORY?: string;\n  FORK_ONLY_MODE?: string;\n  VERCEL_DEPLOY_HOOK_URL?: string;\n  CRON_SECRET?: string;
   TURNSTILE_SECRET_KEY?: string;
   TURNSTILE_SITE_KEY?: string;
   ENVIRONMENT?: "development" | "test" | "production";
