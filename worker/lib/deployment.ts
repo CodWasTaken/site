@@ -3,11 +3,10 @@ import { RequestError } from "./http";
 import { dispatchSiteDeployment } from "./publication-github";
 import type { Env } from "./types";
 
+const defaultSiteRepository = "CodWasTaken/site";
+
 export const siteDeploymentConfigured = (env: Env): boolean =>
-  Boolean(
-    env.VERCEL_DEPLOY_HOOK_URL ||
-      (env.GITHUB_SITE_DEPLOY_TOKEN && env.GITHUB_SITE_REPOSITORY),
-  );
+  Boolean(env.VERCEL_DEPLOY_HOOK_URL || env.GITHUB_SITE_DEPLOY_TOKEN);
 
 export async function requestSiteDeployment(env: Env): Promise<void> {
   if (env.VERCEL_DEPLOY_HOOK_URL) {
@@ -25,11 +24,13 @@ export async function requestSiteDeployment(env: Env): Promise<void> {
     return;
   }
 
-  if (env.GITHUB_SITE_DEPLOY_TOKEN && env.GITHUB_SITE_REPOSITORY) {
-    assertForkOnlyRepository(env.GITHUB_SITE_REPOSITORY, env.FORK_ONLY_MODE);
+  if (env.GITHUB_SITE_DEPLOY_TOKEN) {
+    const siteRepository =
+      env.GITHUB_SITE_REPOSITORY ?? defaultSiteRepository;
+    assertForkOnlyRepository(siteRepository, env.FORK_ONLY_MODE);
     await dispatchSiteDeployment(
       env.GITHUB_SITE_DEPLOY_TOKEN,
-      env.GITHUB_SITE_REPOSITORY,
+      siteRepository,
     );
     return;
   }
