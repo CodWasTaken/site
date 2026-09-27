@@ -2,6 +2,7 @@ import { access, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
+import { resolveDataSource } from "./data-source.mjs";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const destination = resolve(repositoryRoot, ".data");
@@ -19,16 +20,8 @@ for (const localPath of [explicitPath, siblingPath].filter(Boolean)) {
   }
 }
 
-const dataRepository = process.env.PERKCOMMONS_DATA_REPOSITORY?.trim();
-if (!dataRepository) {
-  throw new Error(
-    "No isolated data checkout found. Set PERKCOMMONS_DATA_REPOSITORY to a verified fork URL; official repositories are not accepted.",
-  );
-}
-if (/github\.com[/:]PerkCommons\//i.test(dataRepository)) {
-  throw new Error("Refusing to clone an official PerkCommons repository in fork-only mode.");
-}
-const dataRef = process.env.PERKCOMMONS_DATA_REF?.trim();
+const { repository: dataRepository, ref: dataRef } =
+  resolveDataSource(process.env);
 
 await rm(destination, { recursive: true, force: true });
 
