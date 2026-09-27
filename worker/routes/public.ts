@@ -25,7 +25,7 @@ const publicListingExists = async (
       503,
       "listing_manifest_unavailable",
     );
-  const payload = await response.json<unknown>();
+  const payload = await response.json();
   if (!payload || typeof payload !== "object" || !("listingIds" in payload))
     throw new RequestError(
       "Listing validation is temporarily unavailable.",
