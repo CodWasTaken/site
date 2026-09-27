@@ -18,6 +18,11 @@ const env = {
   SUBMISSION_FINGERPRINT_SECRET: "fingerprint-secret",
   GITHUB_DATA_PUBLICATION_TOKEN: "data-publication-token",
   GITHUB_SITE_DEPLOY_TOKEN: "site-deploy-token",
+  GITHUB_DATA_REPOSITORY: "CodWasTaken/data",
+  GITHUB_DATA_BRANCH: "main",
+  GITHUB_HEAD_OWNER: "CodWasTaken",
+  GITHUB_SITE_REPOSITORY: "CodWasTaken/site",
+  FORK_ONLY_MODE: "true",
 } satisfies Env;
 
 const removalBatch = (
@@ -70,7 +75,7 @@ test("an upheld report creates a PR deleting only its stable listing file", asyn
       return Response.json(
         {
           number: 14,
-          html_url: "https://github.com/PerkCommons/data/pull/14",
+          html_url: "https://github.com/CodWasTaken/data/pull/14",
           state: "open",
           merged: false,
           merged_at: null,
@@ -159,7 +164,7 @@ test("removal reconciliation waits for validation before merge and deployment", 
     if (url.endsWith("/pulls/14"))
       return Response.json({
         number: 14,
-        html_url: "https://github.com/PerkCommons/data/pull/14",
+        html_url: "https://github.com/CodWasTaken/data/pull/14",
         state: "open",
         merged: false,
         merged_at: null,
