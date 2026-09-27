@@ -21,6 +21,12 @@ export interface ListingEvidence {
   claim: string | null;
 }
 
+export type EditorialReviewState =
+  | "human-reviewed"
+  | "automated-research-pending-human-review"
+  | "legacy-source-checked"
+  | "unconfirmed";
+
 export interface Listing {
   schemaVersion?: "1" | "2.0";
   id: string;
@@ -55,7 +61,82 @@ export interface Listing {
   reviewedAt?: string | null;
   nextReviewAt?: string | null;
   claimsChecked?: string[];
+  reviewMethod: string | null;
+  reviewState: string | null;
+  reviewerReference: string | null;
+  editorialReviewState: EditorialReviewState;
+  verified: boolean;
 }
+
+
+const blockedVerificationStatuses = new Set<ListingStatus>([
+  "unconfirmed",
+  "expired",
+  "disputed",
+  "archived",
+]);
+
+const validEvidenceUrl = (evidence: ListingEvidence): boolean => {
+  try {
+    return new URL(evidence.url).protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
+export function deriveEditorialReviewState(input: {
+  schemaVersion: "1" | "2.0";
+  reviewMethod: string | null;
+  reviewState: string | null;
+  reviewerReference: string | null;
+  reviewedAt: string | null;
+}): EditorialReviewState {
+  if (input.schemaVersion === "1") return "legacy-source-checked";
+  const humanMethod =
+    input.reviewMethod === "human" || input.reviewMethod === "human-assisted";
+  const humanState =
+    input.reviewState === "human-reviewed" || input.reviewState === "published";
+  const humanReviewer =
+    Boolean(input.reviewerReference) &&
+    !input.reviewerReference!.startsWith("automation:");
+  if (humanMethod && humanState && humanReviewer && input.reviewedAt)
+    return "human-reviewed";
+  if (
+    input.reviewMethod === "automated-source-research" ||
+    input.reviewState === "needs-human-review" ||
+    input.reviewState === "automated-lint-passed"
+  )
+    return "automated-research-pending-human-review";
+  return "unconfirmed";
+}
+
+const qualifiesAsVerified = (input: {
+  editorialReviewState: EditorialReviewState;
+  status: ListingStatus;
+  evidenceUrls: ListingEvidence[];
+  claimsChecked: string[];
+  applicationUrl: string | null;
+  deadline: string | null;
+  deadlineType: string | null;
+  global: boolean | null;
+  remote: boolean | null;
+  countries: string[];
+  nextReviewAt: string | null;
+}): boolean => {
+  if (input.editorialReviewState !== "human-reviewed") return false;
+  if (blockedVerificationStatuses.has(input.status)) return false;
+  if (!input.evidenceUrls.some(validEvidenceUrl)) return false;
+  if (!input.nextReviewAt) return false;
+  const claims = new Set(input.claimsChecked);
+  if (!claims.has("program-exists") || !claims.has("eligibility")) return false;
+  if (input.applicationUrl && !claims.has("application-url")) return false;
+  if (input.deadlineType === "fixed" && input.deadline && !claims.has("deadline"))
+    return false;
+  const geographyKnown =
+    input.global !== null || input.remote !== null || input.countries.length > 0;
+  if (!geographyKnown || !claims.has("geography")) return false;
+  return true;
+};
 
 let cache: Listing[] | undefined;
 
@@ -91,6 +172,58 @@ export function normalizeListingRecord(
     const reviewedAt = typeof provenance.reviewedAt === "string"
       ? provenance.reviewedAt
       : null;
+    const reviewMethod = typeof provenance.reviewMethod === "string"
+      ? provenance.reviewMethod
+      : null;
+    const reviewState = typeof classification.reviewState === "string"
+      ? classification.reviewState
+      : null;
+    const reviewerReference = typeof provenance.reviewerReference === "string"
+      ? provenance.reviewerReference
+      : null;
+    const claimsChecked = Array.isArray(provenance.claimsChecked)
+      ? provenance.claimsChecked.filter((item): item is string => typeof item === "string")
+      : [];
+    const nextReviewAt = typeof provenance.nextReviewAt === "string"
+      ? provenance.nextReviewAt
+      : null;
+    const sourceFetchedAt = typeof provenance.sourceFetchedAt === "string"
+      ? provenance.sourceFetchedAt
+      : null;
+    const reviewDate =
+      reviewedAt?.slice(0, 10) ??
+      sourceFetchedAt?.slice(0, 10) ??
+      evidenceUrls.find((evidence) => evidence.checkedAt)?.checkedAt?.slice(0, 10) ??
+      "";
+    const status = availability.status as ListingStatus;
+    const applicationUrl =
+      typeof urls.applicationUrl === "string" ? urls.applicationUrl : null;
+    const deadline =
+      typeof availability.closesAt === "string" ? availability.closesAt : null;
+    const deadlineType =
+      typeof availability.deadlineType === "string" ? availability.deadlineType : null;
+    const global = typeof geography.global === "boolean" ? geography.global : null;
+    const remote = typeof geography.remote === "boolean" ? geography.remote : null;
+    const editorialReviewState = deriveEditorialReviewState({
+      schemaVersion: "2.0",
+      reviewMethod,
+      reviewState,
+      reviewerReference,
+      reviewedAt,
+    });
+    const verified = qualifiesAsVerified({
+      editorialReviewState,
+      status,
+      evidenceUrls,
+      claimsChecked,
+      applicationUrl,
+      deadline,
+      deadlineType,
+      global,
+      remote,
+      countries,
+      nextReviewAt,
+    });
     return {
       schemaVersion: "2.0",
       id: String(raw.id),
@@ -104,10 +237,10 @@ export function normalizeListingRecord(
       value: String(costAndBenefit.benefitSummary),
       sourceUrl: evidenceUrls[0]?.url ?? String(urls.programUrl ?? urls.providerUrl ?? raw.canonicalUrl),
       officialUrl: String(urls.applicationUrl ?? urls.programUrl ?? urls.providerUrl ?? evidenceUrls[0]?.url ?? raw.canonicalUrl),
-      status: availability.status as ListingStatus,
+      status,
       submissionType: "community",
       sponsor: sponsorship.sponsored === true,
-      reviewDate: reviewedAt?.slice(0, 10) ?? "1970-01-01",
+      reviewDate,
       regions: [...new Set(regions)],
       aliases: Array.isArray(raw.aliases) ? raw.aliases as string[] : [],
       resourceType: String(classification.resourceType),
@@ -116,16 +249,21 @@ export function normalizeListingRecord(
         : null,
       providerUrl: typeof urls.providerUrl === "string" ? urls.providerUrl : null,
       programUrl: typeof urls.programUrl === "string" ? urls.programUrl : null,
-      applicationUrl: typeof urls.applicationUrl === "string" ? urls.applicationUrl : null,
+      applicationUrl,
       evidenceUrls,
-      deadline: typeof availability.closesAt === "string" ? availability.closesAt : null,
-      deadlineType: typeof availability.deadlineType === "string" ? availability.deadlineType : null,
-      global: typeof geography.global === "boolean" ? geography.global : null,
-      remote: typeof geography.remote === "boolean" ? geography.remote : null,
+      deadline,
+      deadlineType,
+      global,
+      remote,
       countries,
       reviewedAt,
-      nextReviewAt: typeof provenance.nextReviewAt === "string" ? provenance.nextReviewAt : null,
-      claimsChecked: Array.isArray(provenance.claimsChecked) ? provenance.claimsChecked as string[] : [],
+      nextReviewAt,
+      claimsChecked,
+      reviewMethod,
+      reviewState,
+      reviewerReference,
+      editorialReviewState,
+      verified,
     } satisfies Listing;
   }
   const legacy = raw as Omit<Listing, "category" | "subcategories"> & {
@@ -139,6 +277,11 @@ export function normalizeListingRecord(
     schemaVersion: "1",
     category,
     subcategories: normalizeSubcategories(category, legacy.subcategories),
+    reviewMethod: null,
+    reviewState: null,
+    reviewerReference: null,
+    editorialReviewState: "legacy-source-checked",
+    verified: false,
   };
 }
 
