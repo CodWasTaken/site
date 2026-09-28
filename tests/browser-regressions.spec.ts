@@ -7,6 +7,7 @@ const representativeRoutes = [
   { path: "/categories/startup-benefits/", status: 200 },
   { path: "/about/", status: 200 },
   { path: "/trust/", status: 200 },
+  { path: "/data-quality/", status: 200 },
   { path: "/privacy/", status: 200 },
   { path: "/__perkcommons_runtime_probe_missing__", status: 404 },
 ] as const;
