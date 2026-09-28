@@ -36,3 +36,23 @@ test("base structured data uses the configured origin", async () => {
   assert.match(json, /https:\/\/next\.example/);
   assert.doesNotMatch(json, /https:\/\/perkcommons\.com/);
 });
+
+test("base structured data links the site, project repositories, and supported contact point", async () => {
+  const module = await loadSeo();
+  assert.ok(module);
+  const json = JSON.stringify(module.baseStructuredData(new URL("https://preview.example/")));
+  assert.match(json, /https:\/\/github\.com\/CodWasTaken\/site/);
+  assert.match(json, /https:\/\/github\.com\/CodWasTaken\/data/);
+  assert.match(json, /mailto:hello@perkcommons\.com/);
+  assert.match(json, /publisher/);
+  assert.match(json, /#organization/);
+});
+
+test("structured data does not invent a local business, review score, or street address", async () => {
+  const module = await loadSeo();
+  assert.ok(module);
+  const json = JSON.stringify(module.baseStructuredData(new URL("https://preview.example/")));
+  assert.doesNotMatch(json, /LocalBusiness/);
+  assert.doesNotMatch(json, /aggregateRating/);
+  assert.doesNotMatch(json, /streetAddress/);
+});
