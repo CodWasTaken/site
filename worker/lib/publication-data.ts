@@ -10,6 +10,19 @@ export type PublicationStatus =
 
 export type PublicationDeadlineType = "fixed" | "rolling" | "periodic" | "unknown" | "none";
 
+export type PublicationReviewMethod =
+  | "human"
+  | "human-assisted"
+  | "automated-source-research"
+  | "legacy-record-migration";
+
+export type PublicationReviewState =
+  | "published"
+  | "human-reviewed"
+  | "needs-human-review"
+  | "automated-lint-passed"
+  | "unreviewed";
+
 export interface PublicationPayload {
   submission_id: string;
   target_listing_id?: string | null;
@@ -41,6 +54,11 @@ export interface PublicationPayload {
   claims_checked: string[];
   next_review_at: string | null;
   normalized_at: string;
+  review_method: PublicationReviewMethod;
+  review_state: PublicationReviewState;
+  reviewed_at: string | null;
+  reviewer_reference: string | null;
+  source_fetched_at: string | null;
 }
 
 interface EvidenceUrl {
@@ -72,7 +90,7 @@ export interface PublishedOpportunity {
     audiences: string[];
     organizationStages: string[];
     benefitTypes: [];
-    reviewState: "published";
+    reviewState: PublicationReviewState;
     defaultSearchEligible: boolean;
   };
   geography: {
@@ -113,12 +131,12 @@ export interface PublishedOpportunity {
     researchAffiliationRequired: null;
   };
   reviewProvenance: {
-    reviewedAt: string;
-    reviewMethod: "human";
-    reviewerReference: "role:moderator";
+    reviewedAt: string | null;
+    reviewMethod: PublicationReviewMethod;
+    reviewerReference: string | null;
     claimsChecked: string[];
     nextReviewAt: string | null;
-    sourceFetchedAt: null;
+    sourceFetchedAt: string | null;
     sourceHash: null;
     confidence: null;
     importSource: null;
@@ -191,6 +209,22 @@ export const publicationPayloadIssues = (payload: PublicationPayload): string[] 
     issues.push("claims_checked");
   if (!payload.normalized_at || Number.isNaN(new Date(payload.normalized_at).valueOf()))
     issues.push("normalized_at");
+
+  const humanMethod =
+    payload.review_method === "human" || payload.review_method === "human-assisted";
+  const humanState =
+    payload.review_state === "published" || payload.review_state === "human-reviewed";
+  const reviewedAtValid =
+    Boolean(payload.reviewed_at) &&
+    !Number.isNaN(new Date(payload.reviewed_at as string).valueOf());
+  const publicReviewerReference =
+    Boolean(payload.reviewer_reference) &&
+    !payload.reviewer_reference!.startsWith("automation:");
+
+  if (!REVIEW_METHODS.has(payload.review_method)) issues.push("review_method");
+  if (!REVIEW_STATES.has(payload.review_state)) issues.push("review_state");
+  if (!humanMethod || !humanState || !reviewedAtValid || !publicReviewerReference)
+    issues.push("human_review_provenance");
   return [...new Set(issues)];
 };
 
@@ -205,22 +239,45 @@ const STATUSES = new Set<unknown>([
   "disputed", "archived",
 ]);
 const DEADLINE_TYPES = new Set<unknown>(["fixed", "rolling", "periodic", "unknown", "none"]);
+const REVIEW_METHODS = new Set<unknown>([
+  "human",
+  "human-assisted",
+  "automated-source-research",
+  "legacy-record-migration",
+]);
+const REVIEW_STATES = new Set<unknown>([
+  "published",
+  "human-reviewed",
+  "needs-human-review",
+  "automated-lint-passed",
+  "unreviewed",
+]);
 
 export const toPublishedOpportunity = (
   payload: PublicationPayload,
 ): PublishedOpportunity => {
-  const reviewedAt = new Date(payload.normalized_at).toISOString();
+  const normalizedAt = new Date(payload.normalized_at).toISOString();
+  const reviewedAt =
+    payload.reviewed_at && !Number.isNaN(new Date(payload.reviewed_at).valueOf())
+      ? new Date(payload.reviewed_at).toISOString()
+      : null;
+  const sourceFetchedAt =
+    payload.source_fetched_at &&
+    !Number.isNaN(new Date(payload.source_fetched_at).valueOf())
+      ? new Date(payload.source_fetched_at).toISOString()
+      : null;
+  const evidenceCheckedAt = sourceFetchedAt ?? reviewedAt ?? normalizedAt;
   const createdAt =
     payload.original_created_at &&
     !Number.isNaN(new Date(payload.original_created_at).valueOf())
       ? new Date(payload.original_created_at).toISOString()
-      : reviewedAt;
+      : normalizedAt;
   const applicationUrl = payload.application_url || null;
   const evidenceUrls: EvidenceUrl[] = [
     {
       type: "overview",
       url: payload.program_url,
-      checkedAt: reviewedAt,
+      checkedAt: evidenceCheckedAt,
       claim: "Program existence and overview",
     },
   ];
@@ -228,7 +285,7 @@ export const toPublishedOpportunity = (
     evidenceUrls.push({
       type: "application",
       url: applicationUrl,
-      checkedAt: reviewedAt,
+      checkedAt: evidenceCheckedAt,
       claim: "Application destination",
     });
   const benefitSummary = clip(
@@ -257,7 +314,7 @@ export const toPublishedOpportunity = (
       audiences: [],
       organizationStages: [],
       benefitTypes: [],
-      reviewState: "published",
+      reviewState: payload.review_state,
       defaultSearchEligible: payload.default_search_eligible,
     },
     geography: {
@@ -299,11 +356,11 @@ export const toPublishedOpportunity = (
     },
     reviewProvenance: {
       reviewedAt,
-      reviewMethod: "human",
-      reviewerReference: "role:moderator",
+      reviewMethod: payload.review_method,
+      reviewerReference: payload.reviewer_reference,
       claimsChecked: payload.claims_checked,
       nextReviewAt: payload.next_review_at,
-      sourceFetchedAt: null,
+      sourceFetchedAt,
       sourceHash: null,
       confidence: null,
       importSource: null,
@@ -311,7 +368,7 @@ export const toPublishedOpportunity = (
     },
     changeHistory: {
       createdAt,
-      updatedAt: reviewedAt,
+      updatedAt: normalizedAt,
       previousIds: [],
       supersedes: [],
       supersededBy: [],
