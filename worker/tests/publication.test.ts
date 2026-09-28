@@ -39,6 +39,11 @@ const payload: PublicationPayload = {
   claims_checked: ["program-exists", "eligibility", "benefit", "application-url", "deadline", "geography"],
   next_review_at: "2027-01-15",
   normalized_at: "2026-07-19T12:00:00Z",
+  review_method: "human",
+  review_state: "published",
+  reviewed_at: "2026-07-19T11:45:00Z",
+  reviewer_reference: "role:moderator",
+  source_fetched_at: null,
 };
 
 const env = {
@@ -73,6 +78,8 @@ test("publication data uses stable IDs and the public data schema", () => {
   assert.equal(published.urls.applicationUrl, payload.application_url);
   assert.equal(published.canonicalUrl, payload.program_url);
   assert.equal(published.reviewProvenance.sourceFetchedAt, null);
+  assert.equal(published.reviewProvenance.reviewMethod, "human");
+  assert.equal(published.reviewProvenance.reviewedAt, "2026-07-19T11:45:00.000Z");
   assert.equal(published.availability.status, "open");
   assert.equal(published.classification.defaultSearchEligible, true);
   assert.equal(published.availability.closesAt, "2026-12-01");
@@ -80,6 +87,22 @@ test("publication data uses stable IDs and the public data schema", () => {
   assert.deepEqual(published.reviewProvenance.claimsChecked, payload.claims_checked);
   assert.equal(published.reviewProvenance.reviewerReference, "role:moderator");
   assert.equal(published.sponsorship.sponsored, false);
+});
+
+test("automated research is never serialized as a human review", () => {
+  const automated: PublicationPayload = {
+    ...payload,
+    review_method: "automated-source-research",
+    review_state: "needs-human-review",
+    reviewed_at: null,
+    reviewer_reference: "automation:source-research-v1",
+    source_fetched_at: "2026-07-19T10:30:00Z",
+  };
+  const published = toPublishedOpportunity(automated);
+  assert.equal(published.classification.reviewState, "needs-human-review");
+  assert.equal(published.reviewProvenance.reviewMethod, "automated-source-research");
+  assert.equal(published.reviewProvenance.reviewedAt, null);
+  assert.equal(published.reviewProvenance.reviewerReference, "automation:source-research-v1");
 });
 
 test("listing updates preserve the canonical ID and original creation time", () => {
