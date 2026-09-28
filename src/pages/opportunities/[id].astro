@@ -30,6 +30,7 @@ const turnstileKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY;
 const isV2 = listing.schemaVersion === "2.0";
 const destinationUrl = listing.applicationUrl ?? listing.programUrl ?? listing.officialUrl;
 const destinationLabel = listing.applicationUrl ? "Open application" : "Open program";
+const reviewDateLabel = listing.reviewDate ? formatDate(listing.reviewDate) : null;
 ---
 
 <BaseLayout
@@ -59,6 +60,12 @@ const destinationLabel = listing.applicationUrl ? "Open application" : "Open pro
             data-pagefind-meta="category"
             >{categories[listing.category]}</a
           >{
+            listing.verified && (
+              <span class="inline-flex items-center gap-1 rounded border border-line px-2 py-1" title="Human-reviewed with current structured evidence">
+                <CheckCircle2 size={14} aria-hidden="true" /> Verified
+              </span>
+            )
+          }{
             listing.sponsor && (
               <span class="rounded border border-line px-2 py-1">
                 Sponsored placement
@@ -133,11 +140,27 @@ const destinationLabel = listing.applicationUrl ? "Open application" : "Open pro
         </section>
         <section class="mt-8 border-t border-line pt-8">
           <h2 class="text-xl font-semibold">Evidence and change history</h2>
-          {isV2 ? <>
-            <p class="mt-3 leading-7 text-muted">Reviewed manually on {formatDate(listing.reviewDate)}. Checked claims: {listing.claimsChecked?.length ? listing.claimsChecked.join(", ") : "not published"}.</p>
-            <ul class="mt-4 space-y-2">{listing.evidenceUrls?.map((evidence) => <li><a href={evidence.url} rel="noopener" class="font-medium">{evidence.type.replaceAll("-", " ")} evidence</a>{evidence.claim ? ` — ${evidence.claim}` : ""}</li>)}</ul>
-            {listing.nextReviewAt && <p class="mt-3 text-sm text-muted">Next review due {formatDate(listing.nextReviewAt.slice(0, 10))}.</p>}
-          </> : <p class="mt-3 leading-7 text-muted">This legacy v1 record cites overview evidence checked on {formatDate(listing.reviewDate)}. Separate eligibility, deadline, pricing, regional-restriction and application evidence have not yet been structured.</p>}
+          {listing.editorialReviewState === "human-reviewed" ? (
+            <p class="mt-3 leading-7 text-muted">
+              Human-reviewed{listing.reviewedAt ? ` on ${formatDate(listing.reviewedAt.slice(0, 10))}` : ""}. Checked claims: {listing.claimsChecked?.length ? listing.claimsChecked.join(", ") : "not published"}.
+            </p>
+          ) : listing.editorialReviewState === "automated-research-pending-human-review" ? (
+            <p class="mt-3 leading-7 text-muted">
+              {reviewDateLabel ? `Provider sources were checked automatically on ${reviewDateLabel}. ` : "Provider sources were checked automatically. "}Human editorial review is still pending.
+            </p>
+          ) : listing.editorialReviewState === "legacy-source-checked" ? (
+            <p class="mt-3 leading-7 text-muted">
+              This legacy v1 record cites overview evidence{reviewDateLabel ? ` checked on ${reviewDateLabel}` : ""}. Separate eligibility, deadline, pricing, regional-restriction and application evidence have not yet been structured.
+            </p>
+          ) : (
+            <p class="mt-3 leading-7 text-muted">
+              Current availability could not be established from the available provider sources. This record has not completed human editorial review.
+            </p>
+          )}
+          {isV2 && listing.evidenceUrls?.length ? (
+            <ul class="mt-4 space-y-2">{listing.evidenceUrls.map((evidence) => <li><a href={evidence.url} rel="noopener" class="font-medium">{evidence.type.replaceAll("-", " ")} evidence</a>{evidence.claim ? ` — ${evidence.claim}` : ""}</li>)}</ul>
+          ) : null}
+          {isV2 && listing.nextReviewAt && <p class="mt-3 text-sm text-muted">Next review due {formatDate(listing.nextReviewAt.slice(0, 10))}.</p>}
           <p class="mt-3 leading-7 text-muted">Git preserves the public record history. Removal and supersession records remain part of the public audit trail.</p>
         </section>
       </div>
@@ -152,7 +175,13 @@ const destinationLabel = listing.applicationUrl ? "Open application" : "Open pro
             <dt class="flex items-center gap-2 text-muted">
               <CheckCircle2 size={16} /> Review
             </dt><dd class="mt-1.5 font-medium">
-              Source checked {formatDate(listing.reviewDate)}
+              {listing.editorialReviewState === "human-reviewed"
+                ? `Human reviewed${reviewDateLabel ? ` ${reviewDateLabel}` : ""}`
+                : listing.editorialReviewState === "automated-research-pending-human-review"
+                  ? `Automated source research${reviewDateLabel ? ` ${reviewDateLabel}` : ""}; human review pending`
+                  : listing.editorialReviewState === "legacy-source-checked"
+                    ? `Legacy source check${reviewDateLabel ? ` ${reviewDateLabel}` : ""}`
+                    : "Human review pending"}
             </dd>
           </div><div>
             <dt class="flex items-center gap-2 text-muted">
