@@ -1,10 +1,11 @@
-# PerkCommons Next
+# PerkCommons
 
-PerkCommons Next is an experimental fork of PerkCommons: an open, evidence-led directory of opportunities. This development site is not the official production PerkCommons implementation.
+PerkCommons is an open, evidence-led directory of opportunities. Public records can have different review states: automated source research is distinct from completed human editorial review.
 
 ## Public entry points
 
 - About and methodology: /about/
+- Trust and transparency: /trust/
 - Browse opportunities: /opportunities/
 - Public opportunity JSON: /data/opportunities.json
 - Public opportunity API: /api/v1/opportunities
@@ -12,7 +13,7 @@ PerkCommons Next is an experimental fork of PerkCommons: an open, evidence-led d
 
 ## Source and provenance
 
-- Experimental site source: https://github.com/CodWasTaken/site
-- Experimental public data: https://github.com/CodWasTaken/data
+- Site source: https://github.com/CodWasTaken/site
+- Public data: https://github.com/CodWasTaken/data
 
-Published directory records should be interpreted with their source URLs, review state, and provenance. This file is an index to public project resources; it does not grant additional copyright, licensing, crawling, or AI-training rights beyond the rights that apply to the referenced material.
+Published directory records should be interpreted with their source URLs, review state, and provenance. A source check does not guarantee eligibility, availability, safety, acceptance, or outcome. This file is an index to public project resources; it does not grant additional copyright, licensing, crawling, or AI-training rights beyond the rights that apply to the referenced material.
