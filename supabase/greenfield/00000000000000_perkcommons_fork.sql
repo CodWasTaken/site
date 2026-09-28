@@ -2448,7 +2448,7 @@ create function public.publication_batch_payload(
 language sql
 security definer
 set search_path = ''
-as $
+as $$
   select
     items.submission_id,
     submissions.target_listing_id,
@@ -2512,7 +2512,7 @@ as $
     on normalized.submission_id = items.submission_id
   where items.batch_id = p_batch_id
   order by normalized.organization, normalized.title, items.submission_id;
-$;
+$$;
 
 revoke all on function public.publication_batch_payload(uuid)
   from public, anon, authenticated;
