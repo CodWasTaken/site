@@ -35,6 +35,11 @@ const payload: PublicationPayload = {
   claims_checked: ["program-exists", "eligibility", "application-url", "deadline", "geography"],
   next_review_at: "2027-01-15",
   normalized_at: "2026-07-22T18:00:00Z",
+  review_method: "human",
+  review_state: "published",
+  reviewed_at: "2026-07-22T17:45:00Z",
+  reviewer_reference: "role:moderator",
+  source_fetched_at: null,
 };
 
 test("v2 publication survives the site display adapter without flattening semantics", () => {
@@ -55,4 +60,30 @@ test("v2 publication survives the site display adapter without flattening semant
   assert.deepEqual(listing.regions, ["PL", "DE", "Remote"]);
   assert.deepEqual(listing.claimsChecked, payload.claims_checked);
   assert.equal(listing.nextReviewAt, "2027-01-15");
+  assert.equal(listing.editorialReviewState, "human-reviewed");
+  assert.equal(listing.reviewedAt, "2026-07-22T17:45:00.000Z");
+  assert.equal(listing.verified, true);
+});
+
+test("automated research remains pending human review through publication serialization", () => {
+  const automated: PublicationPayload = {
+    ...payload,
+    review_method: "automated-source-research",
+    review_state: "needs-human-review",
+    reviewed_at: null,
+    reviewer_reference: "automation:source-research-v1",
+    source_fetched_at: "2026-07-22T16:30:00Z",
+  };
+  const published = toPublishedOpportunity(automated);
+  const listing = normalizeListingRecord(
+    JSON.parse(JSON.stringify(published)) as Record<string, unknown>,
+    "automated-v2.json",
+  );
+
+  assert.equal(published.classification.reviewState, "needs-human-review");
+  assert.equal(published.reviewProvenance.reviewMethod, "automated-source-research");
+  assert.equal(published.reviewProvenance.reviewedAt, null);
+  assert.equal(published.reviewProvenance.sourceFetchedAt, "2026-07-22T16:30:00.000Z");
+  assert.equal(listing.editorialReviewState, "automated-research-pending-human-review");
+  assert.equal(listing.verified, false);
 });
