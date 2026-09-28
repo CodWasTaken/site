@@ -5,7 +5,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 
 <BaseLayout
   title="Trust and transparency — PerkCommons"
-  description="Who operates PerkCommons, how the project is funded, how listings are reviewed, what submission data is collected, and how to report a problem."
+  description="Who operates PerkCommons, how the project is funded, how source research and human review differ, what submission data is collected, and how to report a problem."
 >
   <section class="container py-14">
     <p class="text-sm font-semibold text-brand">Trust and transparency</p>
@@ -15,7 +15,8 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     <p class="mt-5 max-w-3xl text-lg leading-8 text-muted">
       PerkCommons is an open-source project operated by Cod, an individual
       based in Poland. This page explains who is responsible for the project,
-      how it is funded, how records are reviewed, and how to raise a concern.
+      how it is funded, how records are researched and reviewed, and how to
+      raise a concern.
     </p>
 
     <div class="mt-12 grid gap-6 md:grid-cols-2">
@@ -39,18 +40,23 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 
       <section class="rounded-md border border-line bg-surface p-6">
         <h2 class="flex items-center gap-2 text-xl font-semibold">
-          <ShieldCheck size={20} aria-hidden="true" /> Human moderation
+          <ShieldCheck size={20} aria-hidden="true" /> Research and human review
         </h2>
         <p class="mt-3 leading-7 text-muted">
-          Records are checked by hand by moderators using available official
-          and public sources. Moderators can correct or remove a record when
-          information is inaccurate, expired, unsafe, duplicated, or otherwise
-          unsuitable for the directory.
+          PerkCommons uses both automated source research and human moderation.
+          Automated checks can collect provider evidence and suggest a current
+          status, but they do not count as human review. A record is described
+          as human-reviewed only after a moderator completes that review and
+          the review provenance is recorded.
         </p>
         <p class="mt-3 text-sm leading-6 text-muted">
-          A source check is not a guarantee of eligibility, availability, or
-          outcome. The program provider controls the final terms.
+          A source check or human review is not a guarantee of eligibility,
+          availability, safety, acceptance, or outcome. The program provider
+          controls the final terms and may change them without notice.
         </p>
+        <a class="mt-4 inline-flex items-center gap-2 font-medium" href="/about/">
+          Read the review methodology <ExternalLink size={16} aria-hidden="true" />
+        </a>
       </section>
 
       <section class="rounded-md border border-line bg-surface p-6">
@@ -71,34 +77,19 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     <section class="mt-14 border-t border-line pt-10">
       <h2 class="text-2xl font-semibold">Open-source repositories</h2>
       <p class="mt-3 max-w-3xl leading-7 text-muted">
-        The Next development version is maintained in Cod's personal forks.
-        The original PerkCommons project remains available under the official
-        PerkCommons GitHub organization.
+        The current PerkCommons implementation and public dataset are
+        maintained in Cod's GitHub repositories. Public history is preserved
+        in Git so changes to code and published records can be inspected.
       </p>
       <div class="mt-6 grid gap-4 sm:grid-cols-2">
-        <div class="rounded-md border border-line bg-surface p-5">
-          <p class="font-semibold">Next development version</p>
-          <div class="mt-3 space-y-2 text-sm">
-            <a class="flex items-center gap-2" href="https://github.com/CodWasTaken/site" rel="noopener">
-              <Github size={16} aria-hidden="true" /> Site repository
-            </a>
-            <a class="flex items-center gap-2" href="https://github.com/CodWasTaken/data" rel="noopener">
-              <Github size={16} aria-hidden="true" /> Data repository
-            </a>
-            <a class="flex items-center gap-2" href="https://github.com/CodWasTaken/docs" rel="noopener">
-              <Github size={16} aria-hidden="true" /> Documentation repository
-            </a>
-            <a class="flex items-center gap-2" href="https://github.com/CodWasTaken/branding" rel="noopener">
-              <Github size={16} aria-hidden="true" /> Branding repository
-            </a>
-          </div>
-        </div>
-        <div class="rounded-md border border-line bg-surface p-5">
-          <p class="font-semibold">Original PerkCommons project</p>
-          <a class="mt-3 flex items-center gap-2 text-sm" href="https://github.com/PerkCommons" rel="noopener">
-            <Github size={16} aria-hidden="true" /> PerkCommons GitHub organization
-          </a>
-        </div>
+        <a class="rounded-md border border-line bg-surface p-5 no-underline" href="https://github.com/CodWasTaken/site" rel="noopener">
+          <span class="flex items-center gap-2 font-semibold"><Github size={18} aria-hidden="true" /> Site source</span>
+          <span class="mt-2 block text-sm text-muted">Application, moderation runtime, migrations, and release history.</span>
+        </a>
+        <a class="rounded-md border border-line bg-surface p-5 no-underline" href="https://github.com/CodWasTaken/data" rel="noopener">
+          <span class="flex items-center gap-2 font-semibold"><Github size={18} aria-hidden="true" /> Public data</span>
+          <span class="mt-2 block text-sm text-muted">Version-controlled opportunity records, schemas, evidence metadata, and quality reports.</span>
+        </a>
       </div>
     </section>
 
@@ -107,7 +98,8 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       <p class="mt-3 max-w-3xl leading-7 text-muted">
         To report inaccurate, expired, unsafe, or misleading information, open
         the relevant listing and select <strong>Report this listing</strong>.
-        You can also contact the project by email.
+        Reports are reviewed by moderators and do not remove records
+        automatically. You can also contact the project by email.
       </p>
       <div class="mt-5 flex flex-wrap gap-3">
         <a class="inline-flex items-center gap-2 rounded-md bg-action px-5 py-3 font-medium text-white no-underline" href="/opportunities/">
