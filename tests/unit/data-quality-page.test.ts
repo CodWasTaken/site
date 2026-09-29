@@ -18,7 +18,9 @@ test("data-quality page is generated from the checked-in data report", async () 
   assert.match(source, /duplicateUrlRecords/);
   assert.match(source, /brokenLinkRate/);
   assert.match(source, /redirectRate/);
-  assert.match(source, /Not measured/);
+  assert.match(source, /networkMetricValue/);
+  assert.match(source, /URLs inspected/);
+  assert.doesNotMatch(source, />Not measured<\/p>/);
   assert.match(source, /statusCounts/);
 });
 
