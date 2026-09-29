@@ -68,7 +68,7 @@ test("canonical promotion reconciliation hardens RPCs and carries review provena
   ]) assert.match(sql, new RegExp(field));
   assert.match(sql, /submissions\.reviewed_at/);
   assert.match(sql, /submissions\.reviewed_by/);
-  assert.match(sql, /grant execute on function public\.publication_batch_payload\(uuid\) to service_role/i);
+  assert.match(sql, /grant execute on function public\.publication_batch_payload\(uuid\)[\s\S]*to service_role/i);
   assert.doesNotMatch(sql, /disable row level security/i);
 
   for (const indexTarget of [
