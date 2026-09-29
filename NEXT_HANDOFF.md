@@ -1,6 +1,6 @@
-# PerkCommons Next experimental-fork handoff
+# PerkCommons Next promotion handoff
 
-Prepared 2026-07-24. This handoff covers local branches in personal forks owned by `CodWasTaken`. It is not a production release and does not represent the official PerkCommons implementation.
+Originally prepared 2026-07-24 and reconciled for the authorized main-promotion release candidate on 2026-09-29. The release candidate remains non-canonical on the public web until hosted Vercel verification and the later `perkcommons.com` cutover are complete.
 
 ## Completed work
 
@@ -103,8 +103,8 @@ tombstone KV binding and must not be represented as the official site.
 
 ## Known limitations and deferred work
 
-- Availability outcomes are AI-assisted research, not approval. All 332 v2 records touched by research remain `needs-human-review`; 720 ambiguous, blocked, conflicting or unsupported records remain `unconfirmed`.
-- The availability crawl recorded HTTP results, redirect destinations and 61 records with blocked sources, but it is not a full semantic broken-link or redirect-quality audit.
+- Availability/source research is not approval. Automated research never creates human-review provenance; the generated 2026-09-29 queue contains 1,061 records requiring real human source review, including 332 records with no review timestamp.
+- The 2026-09-29 network audit checked 1,086 published URLs and found 0 confirmed broken URLs. Transient/server-side failures are classified as ambiguous; the audit is a transport/source-health check, not a claim that every source's content is semantically correct.
 - The search index is lazy but remains approximately 1 MB uncompressed. Shard-first loading and representative ranking fixtures remain work.
 - Provider pages, original audience guides, comparison UI, separate sitemaps, structured deadlines, and benefit-aware sorting are deferred.
 - Submission tracking references, correction/withdrawal flows, and multiple structured evidence inputs remain deferred.
@@ -112,12 +112,8 @@ tombstone KV binding and must not be represented as the official site.
   moderation UI still needs modular state, saved views, dedicated private
   detail/reveal auditing, selectable publication batches, operational metrics,
   and richer report decisions.
-- The SQL review-concurrency, publication-semantics and listing-update
-  migrations are isolated fork changes. The new listing editor requires
-  `202607240001_listing_update_workflow.sql` in an existing isolated database;
-  it has not been applied from this workspace. Existing approved rows require
-  human re-review before v2 publication.
-- The greenfield baseline was not applied to a hosted Supabase project. It requires Supabase-managed Auth/API roles and the pg_cron extension; validate it once more with `supabase db reset` in the future isolated fork project.
+- Supabase project `fspdxfhijtlebdnftkof` is now the authorized canonical PerkCommons backend. Its live schema was reconciled in place rather than reset or replayed from the historical greenfield baseline; listing-update, review-concurrency and publication-semantics fields are present. Existing approvals still require human re-review before v2 publication.
+- The historical greenfield baseline remains useful only for creating a new empty project; it must not be replayed onto the promoted live database.
 - Edge tombstones require an isolated KV namespace before hosted testing. No namespace was created and no production binding was contacted.
 - Hosted test submissions are not yet Turnstile-protected; do not promote or broadly advertise the test Worker before the fork-only widget is configured.
 - GitHub App authentication, exact hosted deployment state, production-equivalent smoke verification, and publication/removal dashboards remain proposals.
@@ -136,17 +132,16 @@ tombstone KV binding and must not be represented as the official site.
 
 ## Database and deployment requirements
 
-1. For a new isolated project, copy only `supabase/greenfield/00000000000000_perkcommons_fork.sql` into its empty migration directory. Do not combine it with the incremental chain.
-2. Run `supabase db reset`, inspect all RLS/grants, then exercise concurrency, second-review, v2 publication, retention and removal integration tests. Re-review imported or pre-existing approvals; do not backfill editorial facts.
-3. Provision an isolated tombstone KV store and isolated Turnstile/rate-limit configuration; never reuse production identifiers or secrets.
-4. Pin the exact site commit, data commit, schema version, taxonomy version, and minimum migration in the compatibility manifest.
-5. Run the credential-free dry-run workflow first, then deploy only to a distinct non-production hostname after explicit authorization.
-6. Verify homepage 200, changed record 200, tombstoned record 410, exports/search/sitemaps, exact data SHA, and API schema version.
-7. Keep publication and removal reconciliation independent and prevent an older deployment from superseding a newer one.
+1. Treat Supabase project `fspdxfhijtlebdnftkof` as the canonical backend; use forward-only migrations and do not replay the greenfield baseline onto it.
+2. Preserve least-privilege RLS/RPC access, service-role isolation, review provenance, retention scheduling and publication/removal separation.
+3. Pin the release candidate to an exact `CodWasTaken/data` commit with `PERKCOMMONS_RELEASE_CANDIDATE=1` and `PERKCOMMONS_DATA_REF=<40-character SHA>`.
+4. Deploy only to Vercel's non-canonical hostname first; keep `PUBLIC_SITE_URL` on that staging origin and do not point it at `perkcommons.com` yet.
+5. Verify homepage/listing/API/sitemap responses, security headers, noindex/canonical behavior, exact data SHA, submission/report/moderation/publication/update/removal paths, reconciliation cron and logs.
+6. Promote the exact verified site/data revisions to `main` only after hosted verification; perform `perkcommons.com` DNS/domain/canonical cutover as a separate later step.
 
 ## Later transfer to official repositories
 
-Transfer is prohibited until the owner explicitly states Build Week is over and authorizes official changes. After authorization:
+Authorization for the `CodWasTaken/*` main promotion has now been given. Promotion still follows the release-candidate gates above; the public-domain cutover remains deferred until hosted verification is complete. For any later transfer to a different repository owner:
 
 1. Re-verify the authorization and record its scope.
 2. Fetch official upstreams without changing their settings or branches.
@@ -159,6 +154,6 @@ Transfer is prohibited until the owner explicitly states Build Week is over and 
 9. Open separate official pull requests only if explicitly authorized, with no automatic publication or deployment.
 10. Deploy only after separate explicit production authorization, exact-SHA verification, rollback preparation, and human approval.
 
-## Safety attestation
+## Promotion safety status
 
-The official `PerkCommons/site`, `PerkCommons/data`, `PerkCommons/docs`, and `PerkCommons/branding` repositories were not modified, pushed to, branched, merged, or targeted by pull requests. No production Cloudflare Worker, Supabase database, GitHub Actions workflow, secret, or `perkcommons.com` deployment was changed. No production deployment was triggered.
+The release work is confined to `CodWasTaken/*` branches plus the explicitly authorized Supabase project `fspdxfhijtlebdnftkof`. `perkcommons.com` has not been changed. Vercel hosted verification is still blocked because the connected Vercel team currently exposes zero projects through the connector, so no site-main or domain promotion should occur until that hosted gate is completed.
