@@ -41,7 +41,7 @@ const writeHealthyFixture = async (root: string) => {
   await writeFile(join(root, "index.html"), healthyHtml, "utf8");
   await writeFile(join(root, "robots.txt"), "User-agent: *\nAllow: /\nSitemap: https://next.example/sitemap.xml\n", "utf8");
   await writeFile(join(root, "sitemap.xml"), "<urlset></urlset>", "utf8");
-  await writeFile(join(root, "llms.txt"), "PerkCommons Next experimental fork", "utf8");
+  await writeFile(join(root, "llms.txt"), "PerkCommons open opportunity directory", "utf8");
   await writeFile(join(root, "favicon.svg"), "<svg></svg>", "utf8");
   await writeFile(join(root, "brand", "social-card.png"), pngHeader());
   await writeFile(join(root, "_astro", "app.js"), "console.log('ok')", "utf8");
@@ -92,10 +92,11 @@ test("custom 404 page exists and is explicitly noindex", async () => {
   assert.match(page, /href="\/opportunities\/"/);
 });
 
-test("llms.txt identifies the experimental fork and public data entry points", async () => {
+test("llms.txt identifies canonical public data and provenance entry points", async () => {
   const llms = await readFile(resolve("public/llms.txt"), "utf8").catch(() => null);
   assert.ok(llms, "public/llms.txt must exist");
-  assert.match(llms, /experimental/i);
+  assert.doesNotMatch(llms, /experimental fork/i);
+  assert.match(llms, /review state/i);
   assert.match(llms, /\/api\/v1\/opportunities/);
   assert.match(llms, /\/data\/opportunities\.json/);
   assert.match(llms, /CodWasTaken\/site/);

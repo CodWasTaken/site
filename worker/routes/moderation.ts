@@ -403,9 +403,12 @@ const staticRecords = async <T>(
   env: Env,
   assetPath: string,
 ): Promise<T[]> => {
-  const asset = await env.ASSETS.fetch(
-    new Request(new URL(assetPath, request.url), { method: "GET" }),
-  );
+  const assetRequest = new Request(new URL(assetPath, request.url), {
+    method: "GET",
+  });
+  const asset = env.ASSETS
+    ? await env.ASSETS.fetch(assetRequest)
+    : await fetch(assetRequest);
   if (!asset.ok)
     throw new RequestError(
       "The catalogue asset is unavailable.",
@@ -413,7 +416,7 @@ const staticRecords = async <T>(
       "catalogue_unavailable",
     );
   // These are bounded, build-generated assets owned by this Worker deployment.
-  const payload = await asset.json<{ records?: unknown }>();
+  const payload = (await asset.json()) as { records?: unknown };
   if (!Array.isArray(payload.records))
     throw new RequestError(
       "The catalogue asset is invalid.",

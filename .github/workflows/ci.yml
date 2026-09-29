@@ -19,6 +19,30 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Validate release data branch
+        working-directory: .data
+        run: |
+          npm ci
+          npm test
+          npm run coverage
+          npm run migrate:v2
+          set +e
+          npm run audit:sources -- --as-of 2026-09-29
+          audit_exit=$?
+          set -e
+          npm run reports -- --as-of 2026-09-29
+          node -e "const fs=require('node:fs'); for (const p of ['reports/migration-results.json','reports/data-quality.json','reports/source-audit.json']) { const j=JSON.parse(fs.readFileSync(p,'utf8')); console.log(p, JSON.stringify({asOf:j.asOf,recordsInspected:j.recordsInspected,recordsValid:j.recordsValid,recordsFailed:j.recordsFailed,urlsInspected:j.urlsInspected,counts:j.counts,metrics:j.metrics},null,2)); }"
+          git status --short
+          exit "$audit_exit"
+      - name: Upload release data reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perkcommons-data-release-reports
+          path: |
+            .data/reports/*.json
+            .data/reports/*.md
+          if-no-files-found: error
       - run: npm ci
       - run: npm test
       - run: npm run build

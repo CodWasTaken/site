@@ -39,6 +39,11 @@ const payload: PublicationPayload = {
   claims_checked: ["program-exists", "eligibility", "benefit", "application-url", "deadline", "geography"],
   next_review_at: "2027-01-15",
   normalized_at: "2026-07-19T12:00:00Z",
+  review_method: "human",
+  review_state: "published",
+  reviewed_at: "2026-07-19T11:45:00Z",
+  reviewer_reference: "role:moderator",
+  source_fetched_at: null,
 };
 
 const env = {
@@ -49,6 +54,11 @@ const env = {
   SUBMISSION_FINGERPRINT_SECRET: "fingerprint-secret",
   GITHUB_DATA_PUBLICATION_TOKEN: "data-publication-token",
   GITHUB_SITE_DEPLOY_TOKEN: "site-deploy-token",
+  GITHUB_DATA_REPOSITORY: "CodWasTaken/data",
+  GITHUB_DATA_BRANCH: "main",
+  GITHUB_HEAD_OWNER: "CodWasTaken",
+  GITHUB_SITE_REPOSITORY: "CodWasTaken/site",
+  FORK_ONLY_MODE: "true",
 } satisfies Env;
 
 const administrator: Moderator = {
@@ -68,6 +78,8 @@ test("publication data uses stable IDs and the public data schema", () => {
   assert.equal(published.urls.applicationUrl, payload.application_url);
   assert.equal(published.canonicalUrl, payload.program_url);
   assert.equal(published.reviewProvenance.sourceFetchedAt, null);
+  assert.equal(published.reviewProvenance.reviewMethod, "human");
+  assert.equal(published.reviewProvenance.reviewedAt, "2026-07-19T11:45:00.000Z");
   assert.equal(published.availability.status, "open");
   assert.equal(published.classification.defaultSearchEligible, true);
   assert.equal(published.availability.closesAt, "2026-12-01");
@@ -75,6 +87,22 @@ test("publication data uses stable IDs and the public data schema", () => {
   assert.deepEqual(published.reviewProvenance.claimsChecked, payload.claims_checked);
   assert.equal(published.reviewProvenance.reviewerReference, "role:moderator");
   assert.equal(published.sponsorship.sponsored, false);
+});
+
+test("automated research is never serialized as a human review", () => {
+  const automated: PublicationPayload = {
+    ...payload,
+    review_method: "automated-source-research",
+    review_state: "needs-human-review",
+    reviewed_at: null,
+    reviewer_reference: "automation:source-research-v1",
+    source_fetched_at: "2026-07-19T10:30:00Z",
+  };
+  const published = toPublishedOpportunity(automated);
+  assert.equal(published.classification.reviewState, "needs-human-review");
+  assert.equal(published.reviewProvenance.reviewMethod, "automated-source-research");
+  assert.equal(published.reviewProvenance.reviewedAt, null);
+  assert.equal(published.reviewProvenance.reviewerReference, "automation:source-research-v1");
 });
 
 test("listing updates preserve the canonical ID and original creation time", () => {
@@ -181,7 +209,7 @@ test("starting a publication batch creates one data PR with every claimed item",
       return Response.json(
         {
           number: 12,
-          html_url: "https://github.com/PerkCommons/data/pull/12",
+          html_url: "https://github.com/CodWasTaken/data/pull/12",
           state: "open",
           merged: false,
           merged_at: null,
@@ -231,7 +259,7 @@ test("an active publication batch is returned without rewriting its data branch"
           item_count: 2,
           github_branch: "publication-33333333-3333-4333-8333-333333333333",
           github_pr_number: 12,
-          github_pr_url: "https://github.com/PerkCommons/data/pull/12",
+          github_pr_url: "https://github.com/CodWasTaken/data/pull/12",
           github_head_sha: "new-commit",
           github_merge_sha: null,
           last_error_code: null,
@@ -268,7 +296,7 @@ test("reconciliation merges only after validation and then requests deployment",
           item_count: 1,
           github_branch: "publication-33333333-3333-4333-8333-333333333333",
           github_pr_number: 12,
-          github_pr_url: "https://github.com/PerkCommons/data/pull/12",
+          github_pr_url: "https://github.com/CodWasTaken/data/pull/12",
           github_head_sha: "new-commit",
           github_merge_sha: null,
           last_error_code: null,
@@ -280,7 +308,7 @@ test("reconciliation merges only after validation and then requests deployment",
     if (url.endsWith("/pulls/12") && method === "GET")
       return Response.json({
         number: 12,
-        html_url: "https://github.com/PerkCommons/data/pull/12",
+        html_url: "https://github.com/CodWasTaken/data/pull/12",
         state: "open",
         merged: false,
         merged_at: null,

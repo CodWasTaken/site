@@ -1,32 +1,31 @@
-import {
-  keyedFingerprint,
-  normalizeIpAddress,
-  normalizeUserAgent,
-} from "../lib/fingerprints";
+import { keyedFingerprint, normalizeUserAgent } from "../lib/fingerprints";
 import { apiError, json, readJson, RequestError } from "../lib/http";
 import { strongestBanMode } from "../lib/moderation-policy";
+import { requestClientIp, requestCountry } from "../lib/request-metadata";
 import { insertRows, supabaseRequest } from "../lib/supabase";
 import type { Env } from "../lib/types";
-import {
-  normalizeCountryCode,
-  validateReport,
-  validateSubmission,
-} from "../lib/validation";
+import { validateReport, validateSubmission } from "../lib/validation";
 
 const genericSuccess = () => json({ message: "Submitted for review." }, 201);
 
-const publicListingExists = async (env: Env, listingId: string): Promise<boolean> => {
+const publicListingExists = async (
+  env: Env,
+  listingId: string,
+  requestUrl: string,
+): Promise<boolean> => {
   if (env.TOMBSTONE_STORE && await env.TOMBSTONE_STORE.get(listingId) !== null)
     return true;
   const manifestUrl = new URL("/listing-manifest.json", "https://perkcommons.invalid");
-  const response = await env.ASSETS.fetch(new Request(manifestUrl));
+  const response = env.ASSETS
+    ? await env.ASSETS.fetch(new Request(manifestUrl))
+    : await fetch(new URL("/listing-manifest.json", requestUrl));
   if (!response.ok)
     throw new RequestError(
       "Listing validation is temporarily unavailable.",
       503,
       "listing_manifest_unavailable",
     );
-  const payload = await response.json<unknown>();
+  const payload = await response.json();
   if (!payload || typeof payload !== "object" || !("listingIds" in payload))
     throw new RequestError(
       "Listing validation is temporarily unavailable.",
@@ -126,10 +125,8 @@ const requestSignals = async (
   env: Env,
   email: string | null,
 ) => {
-  const rawIp = normalizeIpAddress(
-    request.headers.get("CF-Connecting-IP") ?? "",
-  );
-  const country = normalizeCountryCode(request.cf?.country);
+  const rawIp = requestClientIp(request);
+  const country = requestCountry(request);
   const emailHash = await keyedFingerprint(
     env.SUBMISSION_FINGERPRINT_SECRET,
     "email",
@@ -236,7 +233,7 @@ export async function handlePublicReport(
     throw new RequestError("Report protection is misconfigured.", 503, "configuration_error");
   const input = validateReport(await readJson(request, 12_000));
   if (input.website) return genericSuccess();
-  if (!(await publicListingExists(env, input.listing_id)))
+  if (!(await publicListingExists(env, input.listing_id, request.url)))
     throw new RequestError(
       "This listing does not exist in the public catalogue.",
       404,

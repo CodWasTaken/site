@@ -19,6 +19,7 @@ const sources = [
   "supabase/migrations/202607220001_next_review_concurrency.sql",
   "supabase/migrations/202607220002_publication_semantics.sql",
   "supabase/migrations/202607240001_listing_update_workflow.sql",
+  "supabase/migrations/202609270001_canonical_promotion_reconciliation.sql",
 ];
 
 const stripTransaction = (sql) =>

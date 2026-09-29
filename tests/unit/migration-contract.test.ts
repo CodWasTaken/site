@@ -46,3 +46,49 @@ test("listing update migration keeps edits in the audited publication workflow",
   assert.match(sql, /grant execute on function public\.create_listing_update[\s\S]*to service_role/);
   assert.doesNotMatch(sql, /grant execute[\s\S]*to (?:anon|authenticated)/);
 });
+
+test("canonical promotion reconciliation hardens RPCs and carries review provenance", async () => {
+  const migrationPath = join(
+    root,
+    "supabase/migrations/202609270001_canonical_promotion_reconciliation.sql",
+  );
+  const sql = await readFile(migrationPath, "utf8").catch(() => null);
+  assert.ok(sql, "canonical promotion reconciliation migration must exist");
+
+  assert.match(sql, /revoke execute on function public\.rls_auto_enable\(\)[\s\S]*from public, anon, authenticated/i);
+  assert.match(sql, /alter function public\.touch_updated_at\(\)[\s\S]*set search_path/i);
+  assert.match(sql, /alter function public\.bump_submission_revision\(\)[\s\S]*set search_path/i);
+  assert.match(sql, /publication_batch_payload/i);
+  for (const field of [
+    "review_method",
+    "review_state",
+    "reviewed_at",
+    "reviewer_reference",
+    "source_fetched_at",
+  ]) assert.match(sql, new RegExp(field));
+  assert.match(sql, /submissions\.reviewed_at/);
+  assert.match(sql, /submissions\.reviewed_by/);
+  assert.match(sql, /grant execute on function public\.publication_batch_payload\(uuid\)[\s\S]*to service_role/i);
+  assert.doesNotMatch(sql, /disable row level security/i);
+
+  for (const indexTarget of [
+    "opportunity_submissions.*reviewed_by",
+    "opportunity_submissions.*assigned_moderator",
+    "opportunity_submissions.*second_reviewer",
+    "normalized_opportunities.*normalized_by",
+    "moderation_actions.*moderator_id",
+    "listing_reports.*assigned_to",
+    "publication_batches.*created_by",
+  ]) assert.match(sql, new RegExp(indexTarget, "is"));
+});
+
+test("greenfield generator includes canonical promotion reconciliation", async () => {
+  const generator = await readFile(
+    join(root, "scripts/build-greenfield-migration.mjs"),
+    "utf8",
+  );
+  assert.match(
+    generator,
+    /supabase\/migrations\/202609270001_canonical_promotion_reconciliation\.sql/,
+  );
+});

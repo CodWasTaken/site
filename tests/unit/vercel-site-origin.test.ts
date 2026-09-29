@@ -26,11 +26,20 @@ test("Vercel applies the reviewed security header baseline to every route", asyn
       source?: string;
       headers?: Array<{ key?: string; value?: string }>;
     }>;
-    rewrites?: unknown;
+    rewrites?: Array<{ source?: string; destination?: string }>;
   };
   const catchAll = config.headers?.find((entry) => entry.source === "/(.*)");
   assert.ok(catchAll, "vercel.json must apply headers to /(.*)");
-  assert.equal(config.rewrites, undefined, "security headers must not add catch-all rewrites");
+  assert.deepEqual(
+    config.rewrites,
+    [{ source: "/api/:path*", destination: "/api?__pc_path=:path*" }],
+    "Vercel should use only the narrow same-origin API rewrite",
+  );
+  assert.equal(
+    config.rewrites?.some((entry) => entry.source === "/(.*)") ?? false,
+    false,
+    "Vercel must not use a catch-all rewrite",
+  );
 
   const headers = new Map(
     (catchAll.headers ?? []).map(({ key, value }) => [key?.toLowerCase(), value]),
