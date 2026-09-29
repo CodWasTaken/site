@@ -32,3 +32,24 @@ test("Vercel allows an exact commit pin inside the approved data repository", ()
   assert.equal(source.repository, "https://github.com/CodWasTaken/data.git");
   assert.equal(source.ref, sha);
 });
+
+test("release Vercel builds require an explicit data commit pin", () => {
+  assert.throws(
+    () =>
+      resolveDataSource({
+        VERCEL: "1",
+        PERKCOMMONS_RELEASE_CANDIDATE: "1",
+      }),
+    /PERKCOMMONS_DATA_REF.*exact.*commit/i,
+  );
+});
+
+test("release Vercel builds accept a full data commit pin", () => {
+  const sha = "879706e1021ae7f48736a0f98051685c08ca8d8e";
+  const source = resolveDataSource({
+    VERCEL: "1",
+    PERKCOMMONS_RELEASE_CANDIDATE: "1",
+    PERKCOMMONS_DATA_REF: sha,
+  });
+  assert.equal(source.ref, sha);
+});
