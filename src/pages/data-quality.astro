@@ -11,9 +11,19 @@ interface CountMetric {
 }
 
 interface UnmeasuredMetric {
-  status: "not-measured" | string;
+  status: "not-measured";
   reason: string;
 }
+
+interface MeasuredNetworkMetric {
+  status: "measured";
+  count: number;
+  inspected: number;
+  percentage: number;
+  asOf: string;
+}
+
+type NetworkMetric = UnmeasuredMetric | MeasuredNetworkMetric;
 
 interface DataQualityReport {
   reportVersion: number;
@@ -28,8 +38,8 @@ interface DataQualityReport {
     multipleEvidenceLinks: CountMetric;
     duplicateUrlRecords: CountMetric;
     genericTextRecords: CountMetric;
-    brokenLinkRate: UnmeasuredMetric;
-    redirectRate: UnmeasuredMetric;
+    brokenLinkRate: NetworkMetric;
+    redirectRate: NetworkMetric;
     uncertainStatus: CountMetric;
     incompleteGeography: CountMetric;
     humanReviewProvenance: CountMetric;
@@ -72,6 +82,16 @@ const formatReportDate = (value: string) =>
     year: "numeric",
     timeZone: "UTC",
   }).format(new Date(`${value}T00:00:00Z`));
+
+const networkMetricValue = (metric: NetworkMetric) =>
+  metric.status === "measured"
+    ? `${metric.percentage.toFixed(2)}%`
+    : "Not measured";
+
+const networkMetricDetail = (metric: NetworkMetric) =>
+  metric.status === "measured"
+    ? `${metric.count.toLocaleString("en")} of ${metric.inspected.toLocaleString("en")} URLs inspected · audit ${formatReportDate(metric.asOf)}`
+    : metric.reason;
 ---
 
 <BaseLayout
@@ -135,13 +155,13 @@ const formatReportDate = (value: string) =>
       <div class="mt-6 grid gap-4 md:grid-cols-2">
         <article class="rounded-md border border-line bg-surface p-5">
           <p class="text-sm text-muted">Broken-link rate</p>
-          <p class="mt-2 text-xl font-semibold">Not measured</p>
-          <p class="mt-2 text-sm leading-6 text-muted">{report.metrics.brokenLinkRate.reason}</p>
+          <p class="mt-2 text-xl font-semibold">{networkMetricValue(report.metrics.brokenLinkRate)}</p>
+          <p class="mt-2 text-sm leading-6 text-muted">{networkMetricDetail(report.metrics.brokenLinkRate)}</p>
         </article>
         <article class="rounded-md border border-line bg-surface p-5">
           <p class="text-sm text-muted">Redirect rate</p>
-          <p class="mt-2 text-xl font-semibold">Not measured</p>
-          <p class="mt-2 text-sm leading-6 text-muted">{report.metrics.redirectRate.reason}</p>
+          <p class="mt-2 text-xl font-semibold">{networkMetricValue(report.metrics.redirectRate)}</p>
+          <p class="mt-2 text-sm leading-6 text-muted">{networkMetricDetail(report.metrics.redirectRate)}</p>
         </article>
       </div>
     </section>
