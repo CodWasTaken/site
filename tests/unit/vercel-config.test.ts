@@ -20,3 +20,16 @@ test("Vercel reconciliation cron is deployable on Hobby", async () => {
     "Hobby deployments must not schedule reconciliation more than once per day",
   );
 });
+
+test("Vercel API graph uses bundler module resolution", async () => {
+  const raw = await readFile(
+    new URL("../../api/tsconfig.json", import.meta.url),
+    "utf8",
+  );
+  const config = JSON.parse(raw) as {
+    compilerOptions?: { module?: string; moduleResolution?: string };
+  };
+
+  assert.equal(config.compilerOptions?.module, "ESNext");
+  assert.equal(config.compilerOptions?.moduleResolution, "Bundler");
+});
