@@ -49,9 +49,11 @@ test("an upheld report creates a PR deleting only its stable listing file", asyn
   const originalFetch = globalThis.fetch;
   let treeBody: Record<string, unknown> | undefined;
   const patches: Array<Record<string, unknown>> = [];
+  const requests: string[] = [];
   globalThis.fetch = async (input, init) => {
     const url = String(input);
     const method = init?.method ?? "GET";
+    requests.push(url);
     if (url.includes("listing_removal_batches?report_id=eq."))
       return Response.json([removalBatch()]);
     if (url.includes("/pulls?state=open")) return Response.json([]);
@@ -103,6 +105,8 @@ test("an upheld report creates a PR deleting only its stable listing file", asyn
       },
     ]);
     assert.ok(patches.some((patch) => patch.status === "validating"));
+    assert.ok(requests.some((url) => url.includes("/repos/CodWasTaken/data/")));
+    assert.equal(requests.some((url) => url.includes("/repos/PerkCommons/")), false);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -147,12 +151,14 @@ test("an already absent listing completes idempotently and requests a rebuild", 
 
 test("removal reconciliation waits for validation before merge and deployment", async () => {
   const originalFetch = globalThis.fetch;
+  const requests: string[] = [];
   let merged = false;
   let finalized = false;
   let deployed = false;
   globalThis.fetch = async (input, init) => {
     const url = String(input);
     const method = init?.method ?? "GET";
+    requests.push(url);
     if (url.includes("status=in.(preparing,validating,merging)"))
       return Response.json([
         removalBatch({
@@ -201,6 +207,8 @@ test("removal reconciliation waits for validation before merge and deployment", 
     assert.equal(merged, true);
     assert.equal(finalized, true);
     assert.equal(deployed, true);
+    assert.ok(requests.some((url) => url.includes("/repos/CodWasTaken/data/")));
+    assert.equal(requests.some((url) => url.includes("/repos/PerkCommons/")), false);
   } finally {
     globalThis.fetch = originalFetch;
   }
