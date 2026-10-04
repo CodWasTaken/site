@@ -70,6 +70,34 @@ test("Vercel adapter always enables validated fork-only targets", () => {
   assert.equal(result.FORK_ONLY_MODE, "true");
 });
 
+test("Vercel adapter maps production identity and Turnstile site key", () => {
+  const result = vercelEnv({
+    VERCEL: "1",
+    VERCEL_ENV: "production",
+    SUPABASE_URL: "https://example.supabase.co",
+    SUPABASE_PUBLISHABLE_KEY: "public",
+    SUPABASE_SERVICE_ROLE_KEY: "service",
+    SUBMISSION_FINGERPRINT_SECRET: "0123456789abcdef0123456789abcdef",
+    PUBLIC_TURNSTILE_SITE_KEY: "site-key",
+    TURNSTILE_SECRET_KEY: "secret-key",
+  });
+  assert.equal(result.ENVIRONMENT, "production");
+  assert.equal(result.TURNSTILE_SITE_KEY, "site-key");
+  assert.equal(result.TURNSTILE_SECRET_KEY, "secret-key");
+});
+
+test("Vercel preview maps to development environment", () => {
+  const result = vercelEnv({
+    VERCEL: "1",
+    VERCEL_ENV: "preview",
+    SUPABASE_URL: "https://example.supabase.co",
+    SUPABASE_PUBLISHABLE_KEY: "public",
+    SUPABASE_SERVICE_ROLE_KEY: "service",
+    SUBMISSION_FINGERPRINT_SECRET: "0123456789abcdef0123456789abcdef",
+  });
+  assert.equal(result.ENVIRONMENT, "development");
+});
+
 test("Vercel adapter refuses an original repository override", () => {
   assert.throws(
     () =>

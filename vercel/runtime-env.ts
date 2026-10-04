@@ -19,6 +19,19 @@ const optional = (
 export function vercelEnv(
   source: EnvironmentSource = process.env,
 ): Env {
+  const vercelEnvironment = optional(source, "VERCEL_ENV");
+  const explicitEnvironment = optional(source, "ENVIRONMENT");
+  const environment: Env["ENVIRONMENT"] =
+    vercelEnvironment === "production"
+      ? "production"
+      : vercelEnvironment === "preview" || vercelEnvironment === "development"
+        ? "development"
+        : explicitEnvironment === "production" ||
+            explicitEnvironment === "test" ||
+            explicitEnvironment === "development"
+          ? explicitEnvironment
+          : undefined;
+
   const env: Env = {
     SUPABASE_URL: required(source, "SUPABASE_URL"),
     SUPABASE_PUBLISHABLE_KEY: required(source, "SUPABASE_PUBLISHABLE_KEY"),
@@ -33,6 +46,13 @@ export function vercelEnv(
     GITHUB_HEAD_OWNER: optional(source, "GITHUB_HEAD_OWNER") ?? "CodWasTaken",
     FORK_ONLY_MODE: "true",
   };
+
+  if (environment) env.ENVIRONMENT = environment;
+
+  const turnstileSiteKey =
+    optional(source, "TURNSTILE_SITE_KEY") ??
+    optional(source, "PUBLIC_TURNSTILE_SITE_KEY");
+  if (turnstileSiteKey) env.TURNSTILE_SITE_KEY = turnstileSiteKey;
 
   const turnstileSecret = optional(source, "TURNSTILE_SECRET_KEY");
   if (turnstileSecret) env.TURNSTILE_SECRET_KEY = turnstileSecret;
