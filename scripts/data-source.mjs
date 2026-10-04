@@ -2,6 +2,10 @@ const VERCEL_DATA_REPOSITORY =
   "https://github.com/CodWasTaken/data.git";
 const VERCEL_DEFAULT_REF = "main";
 
+export function isExactCommitRef(ref) {
+  return typeof ref === "string" && /^[0-9a-f]{40}$/i.test(ref);
+}
+
 /**
  * Resolve the public data source without allowing builds to drift to the
  * original PerkCommons organization. Release builds may pin an exact commit.
@@ -37,7 +41,7 @@ export function resolveDataSource(env = process.env) {
   }
   if (
     isReleaseCandidate &&
-    (!configuredRef || !/^[0-9a-f]{40}$/i.test(configuredRef))
+    (!configuredRef || !isExactCommitRef(configuredRef))
   ) {
     throw new Error(
       "PERKCOMMONS_DATA_REF must be an exact 40-character commit SHA for release-candidate Vercel builds.",

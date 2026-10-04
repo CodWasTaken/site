@@ -2,7 +2,7 @@ import { access, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
-import { resolveDataSource } from "./data-source.mjs";
+import { isExactCommitRef, resolveDataSource } from "./data-source.mjs";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const destination = resolve(repositoryRoot, ".data");
@@ -25,10 +25,45 @@ const { repository: dataRepository, ref: dataRef } =
 
 await rm(destination, { recursive: true, force: true });
 
+const runGit = (args, label) =>
+  new Promise((resolveCommand, rejectCommand) => {
+    const command = spawn("git", args, {
+      cwd: repositoryRoot,
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+      stdio: "inherit",
+    });
+
+    command.once("error", rejectCommand);
+    command.once("close", (code, signal) => {
+      if (code === 0) {
+        resolveCommand();
+        return;
+      }
+
+      const reason = signal
+        ? `signal ${signal}`
+        : `exit code ${code ?? "unknown"}`;
+      rejectCommand(new Error(`${label} ended with ${reason}`));
+    });
+  });
+
 try {
-  await new Promise((resolveClone, rejectClone) => {
-    const clone = spawn(
-      "git",
+  if (isExactCommitRef(dataRef)) {
+    await runGit(["init", destination], "git init");
+    await runGit(
+      ["-C", destination, "remote", "add", "origin", dataRepository],
+      "git remote add",
+    );
+    await runGit(
+      ["-C", destination, "fetch", "--depth", "1", "origin", dataRef],
+      "git fetch",
+    );
+    await runGit(
+      ["-C", destination, "checkout", "--detach", dataRef],
+      "git checkout",
+    );
+  } else {
+    await runGit(
       [
         "clone",
         "--depth",
@@ -38,24 +73,9 @@ try {
         dataRepository,
         destination,
       ],
-      {
-        cwd: repositoryRoot,
-        env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
-        stdio: "inherit",
-      },
+      "git clone",
     );
-
-    clone.once("error", rejectClone);
-    clone.once("close", (code, signal) => {
-      if (code === 0) {
-        resolveClone();
-        return;
-      }
-
-      const reason = signal ? `signal ${signal}` : `exit code ${code ?? "unknown"}`;
-      rejectClone(new Error(`git clone ended with ${reason}`));
-    });
-  });
+  }
 } catch (error) {
   await rm(destination, { recursive: true, force: true });
   const reason = error instanceof Error ? error.message : String(error);

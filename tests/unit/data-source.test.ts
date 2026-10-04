@@ -1,6 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveDataSource } from "../../scripts/data-source.mjs";
+import {
+  isExactCommitRef,
+  resolveDataSource,
+} from "../../scripts/data-source.mjs";
+
+test("exact data refs distinguish immutable commits from branches", () => {
+  assert.equal(
+    isExactCommitRef("416803924a98bd3169169f790943079e648f1fab"),
+    true,
+  );
+  assert.equal(isExactCommitRef("next/schema-v2"), false);
+  assert.equal(isExactCommitRef("4168039"), false);
+});
 
 test("Vercel defaults to the CodWasTaken data repository", () => {
   const source = resolveDataSource({ VERCEL: "1" });
