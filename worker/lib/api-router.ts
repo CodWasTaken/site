@@ -1,5 +1,5 @@
-import { apiError, json, methodNotAllowed, RequestError } from "./http";
-import type { Env } from "./types";
+import { apiError, json, methodNotAllowed, RequestError } from "./http.js";
+import type { Env } from "./types.js";
 import {
   bans,
   canonicalListingDetail,
@@ -22,12 +22,12 @@ import {
   resolveReport,
   submissionDetail,
   unconfirmedListings,
-} from "../routes/moderation";
+} from "../routes/moderation.js";
 import {
   handlePublicError,
   handlePublicReport,
   handlePublicSubmission,
-} from "../routes/public";
+} from "../routes/public.js";
 
 const submissionActionPattern =
   /^\/api\/moderation\/submissions\/([0-9a-f-]+)\/(approve|decline|flag|unflag|undo|notes)$/i;

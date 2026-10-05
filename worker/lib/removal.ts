@@ -1,14 +1,14 @@
-import { requestSiteDeployment, siteDeploymentConfigured } from "./deployment";
-import { githubTargetConfig } from "./github-targets";
+import { requestSiteDeployment, siteDeploymentConfigured } from "./deployment.js";
+import { githubTargetConfig } from "./github-targets.js";
 import {
   createRemovalPullRequest,
   getPublicationChecks,
   getPublicationPullRequest,
   mergeRemovalPullRequest,
   removalBranch,
-} from "./publication-github";
-import { callRpc, supabaseRequest } from "./supabase";
-import type { Env } from "./types";
+} from "./publication-github.js";
+import { callRpc, supabaseRequest } from "./supabase.js";
+import type { Env } from "./types.js";
 
 export interface ListingRemovalBatch {
   id: string;

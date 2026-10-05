@@ -1,4 +1,4 @@
-import taxonomyData from "../generated/opportunity-taxonomy";
+import taxonomyData from "../generated/opportunity-taxonomy.js";
 
 export type CategoryId = (typeof taxonomyData.categories)[number]["id"];
 export const CATEGORY_IDS = taxonomyData.categories.map(

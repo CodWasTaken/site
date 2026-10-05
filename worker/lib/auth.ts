@@ -1,7 +1,7 @@
-import { apiError, RequestError } from "./http";
-import { roleAllows } from "./moderation-policy";
-import { supabaseRequest } from "./supabase";
-import type { Env, Moderator, ModeratorRole } from "./types";
+import { apiError, RequestError } from "./http.js";
+import { roleAllows } from "./moderation-policy.js";
+import { supabaseRequest } from "./supabase.js";
+import type { Env, Moderator, ModeratorRole } from "./types.js";
 
 export const SESSION_COOKIE = "pc_moderator_session";
 

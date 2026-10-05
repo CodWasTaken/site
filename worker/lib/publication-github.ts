@@ -1,6 +1,6 @@
-import { RequestError } from "./http";
-import type { GithubTargetConfig } from "./github-targets";
-import type { PublishedOpportunity } from "./publication-data";
+import { RequestError } from "./http.js";
+import type { GithubTargetConfig } from "./github-targets.js";
+import type { PublishedOpportunity } from "./publication-data.js";
 
 const GITHUB_API_VERSION = "2026-03-10";
 

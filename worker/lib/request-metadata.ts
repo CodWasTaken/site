@@ -1,5 +1,5 @@
-import { normalizeIpAddress } from "./fingerprints";
-import { normalizeCountryCode } from "./validation";
+import { normalizeIpAddress } from "./fingerprints.js";
+import { normalizeCountryCode } from "./validation.js";
 
 export const requestClientIp = (request: Request): string | null =>
   normalizeIpAddress(

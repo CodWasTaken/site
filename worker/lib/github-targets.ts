@@ -1,5 +1,5 @@
-import { RequestError } from "./http";
-import type { Env } from "./types";
+import { RequestError } from "./http.js";
+import type { Env } from "./types.js";
 
 export interface GithubTargetConfig {
   dataRepository: string;

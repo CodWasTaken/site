@@ -1,10 +1,10 @@
-import type { SubmissionInput } from "./types";
-import { RequestError } from "./http";
+import type { SubmissionInput } from "./types.js";
+import { RequestError } from "./http.js";
 import {
   CATEGORY_IDS,
   isSubcategoryFor,
   normalizeCategoryId,
-} from "../../src/lib/taxonomy";
+} from "../../src/lib/taxonomy.js";
 
 export const ALLOWED_CATEGORIES = new Set<string>(CATEGORY_IDS);
 

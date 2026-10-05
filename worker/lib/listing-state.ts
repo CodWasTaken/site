@@ -1,6 +1,6 @@
-import { RequestError } from "./http";
-import { SupabaseError, supabaseRequest } from "./supabase";
-import type { Env } from "./types";
+import { RequestError } from "./http.js";
+import { SupabaseError, supabaseRequest } from "./supabase.js";
+import type { Env } from "./types.js";
 
 const listingId = (value: string): string => {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value))

@@ -1,28 +1,28 @@
-import { requestSiteDeployment, siteDeploymentConfigured } from "./deployment";
-import { githubTargetConfig } from "./github-targets";
-import { RequestError } from "./http";
+import { requestSiteDeployment, siteDeploymentConfigured } from "./deployment.js";
+import { githubTargetConfig } from "./github-targets.js";
+import { RequestError } from "./http.js";
 import {
   publicationListingId,
   publicationPayloadIssues,
   toPublishedOpportunity,
   type PublicationPayload,
-} from "./publication-data";
+} from "./publication-data.js";
 import {
   createPublicationPullRequest,
   getPublicationChecks,
   getPublicationPullRequest,
   mergePublicationPullRequest,
   publicationBranch,
-} from "./publication-github";
-import { callRpc, supabaseRequest } from "./supabase";
-import type { Env, Moderator } from "./types";
+} from "./publication-github.js";
+import { callRpc, supabaseRequest } from "./supabase.js";
+import type { Env, Moderator } from "./types.js";
 
 export {
   publicationListingId,
   toPublishedOpportunity,
   type PublicationPayload,
   type PublishedOpportunity,
-} from "./publication-data";
+} from "./publication-data.js";
 
 interface PublicationBatch {
   id: string;

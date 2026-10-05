@@ -3,37 +3,37 @@ import {
   requireModerator,
   sessionCookie,
   authenticateToken,
-} from "../lib/auth";
-import { maskEmail } from "../lib/fingerprints";
-import { actionAllowedForStatus } from "../lib/moderation-policy";
+} from "../lib/auth.js";
+import { maskEmail } from "../lib/fingerprints.js";
+import { actionAllowedForStatus } from "../lib/moderation-policy.js";
 import {
   publicationBatchStatus,
   startPublicationBatch,
-} from "../lib/publication";
-import { prepareListingRemovalForReport } from "../lib/removal";
+} from "../lib/publication.js";
+import { prepareListingRemovalForReport } from "../lib/removal.js";
 import {
   apiError,
   assertSameOrigin,
   json,
   readJson,
   RequestError,
-} from "../lib/http";
+} from "../lib/http.js";
 import {
   callRpc,
   insertRows,
   SupabaseError,
   supabaseRequest,
-} from "../lib/supabase";
-import type { Env, Moderator, SubmissionStatus } from "../lib/types";
+} from "../lib/supabase.js";
+import type { Env, Moderator, SubmissionStatus } from "../lib/types.js";
 import {
   optionalNote,
   requiredChoice,
   safeHttpsUrl,
-} from "../lib/validation";
+} from "../lib/validation.js";
 import {
   isSubcategoryFor,
   normalizeCategoryId,
-} from "../../src/lib/taxonomy";
+} from "../../src/lib/taxonomy.js";
 
 const DECLINE_REASONS = new Set([
   "Duplicate",
@@ -166,7 +166,7 @@ export async function queueSummary(request: Request, env: Env): Promise<Response
     queue: status,
     total: Number.isFinite(total) ? total : result.data.length,
     count: result.data.length,
-    nextCursor: result.data.length === limit ? result.data.at(-1)?.created_at ?? null : null,
+    nextCursor: result.data.length === limit ? result.data[result.data.length - 1]?.created_at ?? null : null,
     submissions: result.data,
   });
 }

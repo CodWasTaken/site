@@ -1,5 +1,5 @@
-import { githubTargetConfig } from "../worker/lib/github-targets";
-import type { Env } from "../worker/lib/types";
+import { githubTargetConfig } from "../worker/lib/github-targets.js";
+import type { Env } from "../worker/lib/types.js";
 
 type EnvironmentSource = Record<string, string | undefined>;
 

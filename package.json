@@ -16,12 +16,13 @@
     "audit:site": "node scripts/audit-site-quality.mjs dist",
     "audit:sinks": "node scripts/audit-dangerous-sinks.mjs",
     "preview": "astro preview",
-    "check": "node scripts/sync-taxonomy.mjs --check && node scripts/build-greenfield-migration.mjs --check && npm run worker:types:check && astro check && tsc --noEmit && tsc -p worker/tsconfig.json --noEmit && tsc -p worker/tests/tsconfig.json --noEmit && npm run audit:sinks",
+    "check": "node scripts/sync-taxonomy.mjs --check && node scripts/build-greenfield-migration.mjs --check && npm run worker:types:check && npm run vercel:types:check && astro check && tsc --noEmit && tsc -p worker/tsconfig.json --noEmit && tsc -p worker/tests/tsconfig.json --noEmit && npm run audit:sinks",
     "greenfield:generate": "node scripts/build-greenfield-migration.mjs",
     "greenfield:check": "node scripts/build-greenfield-migration.mjs --check",
     "test": "npm run check && npm run test:unit",
     "test:unit": "tsx --test tests/unit/*.test.ts worker/tests/*.test.ts",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "vercel:types:check": "tsc -p vercel/tsconfig.runtime.json --noEmit"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.7.4",

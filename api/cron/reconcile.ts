@@ -1,7 +1,7 @@
-import { reconcilePublicationBatches } from "../../worker/lib/publication";
-import { reconcileListingRemovals } from "../../worker/lib/removal";
-import type { Env } from "../../worker/lib/types";
-import { vercelEnv } from "../../vercel/runtime-env";
+import { reconcilePublicationBatches } from "../../worker/lib/publication.js";
+import { reconcileListingRemovals } from "../../worker/lib/removal.js";
+import type { Env } from "../../worker/lib/types.js";
+import { vercelEnv } from "../../vercel/runtime-env.js";
 
 export const authorizeCron = (
   authorization: string | null | undefined,

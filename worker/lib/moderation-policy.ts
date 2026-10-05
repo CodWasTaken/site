@@ -1,4 +1,4 @@
-import type { ModeratorRole, SubmissionStatus } from "./types";
+import type { ModeratorRole, SubmissionStatus } from "./types.js";
 
 export interface BanSignal {
   active: boolean;

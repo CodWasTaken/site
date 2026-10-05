@@ -1,7 +1,7 @@
 import { next } from "@vercel/functions";
-import { requireModerator } from "./worker/lib/auth";
-import { isListingRemovedWithoutEdgeCache } from "./worker/lib/listing-state";
-import { vercelEnv } from "./vercel/runtime-env";
+import { requireModerator } from "./worker/lib/auth.js";
+import { isListingRemovedWithoutEdgeCache } from "./worker/lib/listing-state.js";
+import { vercelEnv } from "./vercel/runtime-env.js";
 
 export const listingIdFromPath = (pathname: string): string | null => {
   const match = pathname.match(/^\/opportunities\/([a-z0-9-]+)\/?$/);

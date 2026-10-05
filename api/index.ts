@@ -1,7 +1,7 @@
-import { handleCronRequest } from "./cron/reconcile";
-import { routeApiRequest } from "../worker/lib/api-router";
-import { installVercelRuntimeCompatibility } from "../vercel/runtime-compat";
-import { vercelEnv } from "../vercel/runtime-env";
+import { handleCronRequest } from "./cron/reconcile.js";
+import { routeApiRequest } from "../worker/lib/api-router.js";
+import { installVercelRuntimeCompatibility } from "../vercel/runtime-compat.js";
+import { vercelEnv } from "../vercel/runtime-env.js";
 
 installVercelRuntimeCompatibility();
 

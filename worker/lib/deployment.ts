@@ -1,7 +1,7 @@
-import { assertForkOnlyRepository } from "./github-targets";
-import { RequestError } from "./http";
-import { dispatchSiteDeployment } from "./publication-github";
-import type { Env } from "./types";
+import { assertForkOnlyRepository } from "./github-targets.js";
+import { RequestError } from "./http.js";
+import { dispatchSiteDeployment } from "./publication-github.js";
+import type { Env } from "./types.js";
 
 const defaultSiteRepository = "CodWasTaken/site";
 

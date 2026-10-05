@@ -1,10 +1,10 @@
-import { keyedFingerprint, normalizeUserAgent } from "../lib/fingerprints";
-import { apiError, json, readJson, RequestError } from "../lib/http";
-import { strongestBanMode } from "../lib/moderation-policy";
-import { requestClientIp, requestCountry } from "../lib/request-metadata";
-import { insertRows, supabaseRequest } from "../lib/supabase";
-import type { Env } from "../lib/types";
-import { validateReport, validateSubmission } from "../lib/validation";
+import { keyedFingerprint, normalizeUserAgent } from "../lib/fingerprints.js";
+import { apiError, json, readJson, RequestError } from "../lib/http.js";
+import { strongestBanMode } from "../lib/moderation-policy.js";
+import { requestClientIp, requestCountry } from "../lib/request-metadata.js";
+import { insertRows, supabaseRequest } from "../lib/supabase.js";
+import type { Env } from "../lib/types.js";
+import { validateReport, validateSubmission } from "../lib/validation.js";
 
 const genericSuccess = () => json({ message: "Submitted for review." }, 201);
 
