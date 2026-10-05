@@ -1,4 +1,6 @@
 import { handleCronRequest } from "./cron/reconcile.js";
+import { catalogAssets } from "../vercel/generated-catalog.mjs";
+import { createCatalogAssetsBinding } from "../vercel/catalog-assets.js";
 import { routeApiRequest } from "../worker/lib/api-router.js";
 import { installVercelRuntimeCompatibility } from "../vercel/runtime-compat.js";
 import { vercelEnv } from "../vercel/runtime-env.js";
@@ -63,6 +65,8 @@ export default {
     const normalized = await normalizeApiRequest(request);
     if (new URL(normalized.url).pathname === "/api/cron/reconcile")
       return handleCronRequest(normalized, env);
+
+    env.ASSETS = createCatalogAssetsBinding(catalogAssets);
     return routeApiRequest(normalized, env);
   },
 };

@@ -33,3 +33,21 @@ test("Vercel API graph uses bundler module resolution", async () => {
   assert.equal(config.compilerOptions?.module, "ESNext");
   assert.equal(config.compilerOptions?.moduleResolution, "Bundler");
 });
+
+
+test("Vercel public API uses build-time catalogue assets instead of self-fetching", async () => {
+  const [apiSource, packageRaw] = await Promise.all([
+    readFile(new URL("../../api/index.ts", import.meta.url), "utf8"),
+    readFile(new URL("../../package.json", import.meta.url), "utf8"),
+  ]);
+  const pkg = JSON.parse(packageRaw) as { scripts?: Record<string, string> };
+
+  assert.match(apiSource, /generated-catalog\.mjs/);
+  assert.match(apiSource, /createCatalogAssetsBinding/);
+  assert.match(apiSource, /env\.ASSETS\s*=/);
+  assert.match(
+    pkg.scripts?.build ?? "",
+    /generate-vercel-catalog/,
+    "the build must generate catalogue data before Vercel traces functions",
+  );
+});
