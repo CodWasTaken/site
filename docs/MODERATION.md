@@ -219,7 +219,7 @@ Supabase Cron. The function redacts private fields, deletes expired private
 records, and writes aggregate counts to the RLS-protected
 `moderation_retention_runs` table. It only reports submissions awaiting review
 for more than 180 days and permanent bans older than one year; it does not make
-those human decisions. The initial accountable maintainer, `CodWasTaken`,
+those human decisions. The initial accountable maintainer, Nataniel Bogacki (`CodWasTaken` on GitHub),
 reviews those counts quarterly. The canonical public policy and decision record
 live in the `PerkCommons/docs` repository.
 

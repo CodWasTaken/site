@@ -44,6 +44,8 @@ test("base structured data links the site, project repositories, and supported c
   assert.match(json, /https:\/\/github\.com\/CodWasTaken\/site/);
   assert.match(json, /https:\/\/github\.com\/CodWasTaken\/data/);
   assert.match(json, /mailto:hello@perkcommons\.com/);
+  assert.match(json, /Nataniel Bogacki/);
+  assert.doesNotMatch(json, /operated by Cod from Poland/);
   assert.match(json, /publisher/);
   assert.match(json, /#organization/);
 });

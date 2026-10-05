@@ -20,7 +20,7 @@ export const baseStructuredData = (site: URL): unknown[] => {
       url: origin,
       logo: `${origin}/brand/mark.svg`,
       description:
-        "Open-source opportunity directory operated by Cod from Poland.",
+        "Open-source opportunity directory operated by Nataniel Bogacki from Poland.",
       areaServed: "Worldwide",
       sameAs: [
         "https://github.com/CodWasTaken/site",

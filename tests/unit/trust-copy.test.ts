@@ -26,6 +26,18 @@ test("trust and about copy describe mixed review coverage without experimental-f
   assert.doesNotMatch(about, /not the production PerkCommons service/i);
 });
 
+test("public accountability copy names Nataniel Bogacki rather than the Cod alias", async () => {
+  const [trust, about] = await Promise.all([
+    read("../../src/pages/trust.astro"),
+    read("../../src/pages/about.astro"),
+  ]);
+
+  assert.match(trust, /Nataniel Bogacki/);
+  assert.match(about, /Nataniel Bogacki/);
+  assert.doesNotMatch(trust, /operated by Cod[.,]/);
+  assert.doesNotMatch(about, /operated by Cod[.,]/);
+});
+
 test("canonical layout and llms index no longer brand the promoted version as an experiment", async () => {
   const [layout, llms] = await Promise.all([
     read("../../src/layouts/BaseLayout.astro"),
