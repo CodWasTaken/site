@@ -46,6 +46,13 @@ jobs:
             .data/reports/*.json
             .data/reports/*.md
           if-no-files-found: error
+      - name: Restore canonical data snapshot for site build
+        working-directory: .data
+        run: |
+          git reset --hard 28873d3d56f791843bb5bf974940e53fed8316be
+          git clean -fd
+          test "$(git rev-parse HEAD)" = "28873d3d56f791843bb5bf974940e53fed8316be"
+          test -z "$(git status --porcelain)"
       - run: npm ci
       - run: npm test
       - run: npm run build
