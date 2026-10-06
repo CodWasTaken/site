@@ -442,8 +442,14 @@ test("published review queue sorts never-reviewed first, then oldest verificatio
       env,
     );
     assert.equal(response.status, 200);
-    const body = await response.json() as { total: number; listings: Array<{ id: string }> };
+    const body = await response.json() as {
+      total: number;
+      listings: Array<{ id: string; applicationUrl: string | null; deadline: string | null; deadlineType: string | null }>;
+    };
     assert.equal(body.total, 5);
+    assert.equal(body.listings[0]?.applicationUrl, "https://example.org/grant/apply");
+    assert.equal(body.listings[0]?.deadline, null);
+    assert.equal(body.listings[0]?.deadlineType, "none");
     assert.deepEqual(body.listings.map((listing) => listing.id), [
       "never-alpha",
       "never-zulu",

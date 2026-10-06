@@ -602,6 +602,8 @@ export async function publishedReviewListings(
     verified: listing.verified === true,
     programUrl: listing.programUrl ?? listing.sourceUrl,
     applicationUrl: listing.applicationUrl ?? null,
+    deadline: listing.deadline ?? null,
+    deadlineType: listing.deadlineType ?? null,
     canonicalUrl: `/opportunities/${listing.id}/`,
   }));
   const nextOffset = offset + page.length;

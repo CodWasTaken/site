@@ -11,6 +11,8 @@ export interface PublishedReviewListing {
   verified: boolean;
   programUrl: string;
   applicationUrl: string | null;
+  deadline: string | null;
+  deadlineType: string | null;
   canonicalUrl: string;
 }
 
@@ -51,6 +53,17 @@ const displayDate = (value: string | null): string => {
     year: "numeric",
     timeZone: "UTC",
   }).format(date);
+};
+
+const deadlineSummary = (listing: PublishedReviewListing): string => {
+  if (listing.deadlineType === "fixed")
+    return listing.deadline
+      ? `Deadline ${displayDate(listing.deadline)}`
+      : "Fixed deadline missing date";
+  if (listing.deadlineType === "rolling") return "Rolling applications";
+  if (listing.deadlineType === "periodic") return "Recurring application windows";
+  if (listing.deadlineType === "none") return "No application deadline";
+  return "Deadline not structured";
 };
 
 const statusLabel = (value: string): string =>
@@ -112,7 +125,13 @@ export function createPublishedReviewController(options: ControllerOptions) {
       state.textContent = listing.verified
         ? "Meets strict Verified rules"
         : listing.editorialReviewState.replaceAll("-", " ");
-      facts.append(review, next, state);
+      const application = document.createElement("span");
+      application.textContent = listing.applicationUrl
+        ? "Application page linked"
+        : "Application page not structured";
+      const deadline = document.createElement("span");
+      deadline.textContent = deadlineSummary(listing);
+      facts.append(review, next, state, application, deadline);
 
       const sourceLinks = document.createElement("div");
       sourceLinks.className = "mt-4 flex flex-wrap gap-2 text-sm";

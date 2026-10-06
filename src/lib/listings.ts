@@ -335,6 +335,19 @@ export function formatDate(value: string): string {
   return new Intl.DateTimeFormat("en", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${value}T00:00:00Z`));
 }
 
+export function deadlineLabel(
+  listing: Pick<Listing, "deadline" | "deadlineType">,
+): string {
+  const date = listing.deadline?.slice(0, 10) ?? null;
+  if (listing.deadlineType === "fixed")
+    return date ? `Closes ${formatDate(date)}` : "Fixed deadline; date not structured";
+  if (listing.deadlineType === "rolling") return "Rolling applications";
+  if (listing.deadlineType === "periodic") return "Recurring application windows";
+  if (listing.deadlineType === "none") return "No application deadline";
+  if (date) return `Closes ${formatDate(date)}`;
+  return "Deadline not structured";
+}
+
 export function statusLabel(status: ListingStatus): string {
   if (status === "archived") return "Inactive";
   return status

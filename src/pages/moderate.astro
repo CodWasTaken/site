@@ -573,14 +573,14 @@ import { categoryDefinitions } from "../lib/taxonomy";
           ].map((value) => <option value={value}>{value.replaceAll("-", " ")}</option>)}</select>
         </div>
         <label
-          ><span class="text-sm font-medium">Deadline type</span><select
+          ><span class="text-sm font-medium">Application cadence</span><select
             required
             name="deadline_type"
             class="mt-1 min-h-11 w-full rounded-md border border-line px-3"
           >{["fixed", "rolling", "periodic", "unknown", "none"].map((value) => <option value={value}>{value}</option>)}</select></label
         >
         <label
-          ><span class="text-sm font-medium">Deadline</span><input
+          ><span class="text-sm font-medium">Closing date <span class="font-normal text-muted">(fixed deadlines only)</span></span><input
             type="date"
             name="deadline"
             class="mt-1 min-h-11 w-full rounded-md border border-line px-3"
@@ -683,9 +683,10 @@ import { categoryDefinitions } from "../lib/taxonomy";
           /></label
         >
         <label
-          ><span class="text-sm font-medium">Application URL</span><input
+          ><span class="text-sm font-medium">Direct application URL</span><input
             type="url"
             name="application_url"
+            placeholder="https://provider.example/apply"
             class="mt-1 min-h-11 w-full rounded-md border border-line px-3"
           /></label
         >
