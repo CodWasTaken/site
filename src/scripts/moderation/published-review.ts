@@ -13,6 +13,7 @@ export interface PublishedReviewListing {
   applicationUrl: string | null;
   deadline: string | null;
   deadlineType: string | null;
+  applicationCycle: string | null;
   canonicalUrl: string;
 }
 
@@ -131,7 +132,11 @@ export function createPublishedReviewController(options: ControllerOptions) {
         : "Application page not structured";
       const deadline = document.createElement("span");
       deadline.textContent = deadlineSummary(listing);
-      facts.append(review, next, state, application, deadline);
+      const cycle = document.createElement("span");
+      cycle.textContent = listing.applicationCycle
+        ? `Cycle: ${listing.applicationCycle}`
+        : "Cycle details not structured";
+      facts.append(review, next, state, application, deadline, cycle);
 
       const sourceLinks = document.createElement("div");
       sourceLinks.className = "mt-4 flex flex-wrap gap-2 text-sm";

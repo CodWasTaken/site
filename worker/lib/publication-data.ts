@@ -40,6 +40,7 @@ export interface PublicationPayload {
   availability_status: PublicationStatus;
   status_reason: string | null;
   deadline_type: PublicationDeadlineType;
+  application_cycle: string | null;
   deadline: string | null;
   global: boolean | null;
   remote: boolean | null;
@@ -108,7 +109,7 @@ export interface PublishedOpportunity {
     opensAt: null;
     closesAt: string | null;
     deadlineType: PublicationDeadlineType;
-    applicationCycle: null;
+    applicationCycle: string | null;
     nextExpectedOpening: null;
   };
   costAndBenefit: {
@@ -199,6 +200,8 @@ export const publicationPayloadIssues = (payload: PublicationPayload): string[] 
   if (!STATUSES.has(payload.availability_status)) issues.push("availability_status");
   if (!DEADLINE_TYPES.has(payload.deadline_type)) issues.push("deadline_type");
   if (payload.deadline_type === "fixed" && !payload.deadline) issues.push("deadline");
+  if (payload.application_cycle && payload.application_cycle.length > 500)
+    issues.push("application_cycle");
   try {
     const url = new URL(payload.program_url);
     if (url.protocol !== "https:") issues.push("program_url");
@@ -332,7 +335,9 @@ export const toPublishedOpportunity = (
       opensAt: null,
       closesAt: payload.deadline,
       deadlineType: payload.deadline_type,
-      applicationCycle: null,
+      applicationCycle: payload.application_cycle
+        ? clip(payload.application_cycle, 500)
+        : null,
       nextExpectedOpening: null,
     },
     costAndBenefit: {

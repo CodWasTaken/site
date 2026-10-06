@@ -36,6 +36,7 @@ export interface CanonicalListing {
   applicationUrl?: string | null;
   deadline?: string | null;
   deadlineType?: string | null;
+  applicationCycle?: string | null;
   global?: boolean | null;
   remote?: boolean | null;
   countries?: string[];

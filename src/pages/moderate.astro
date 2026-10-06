@@ -580,6 +580,14 @@ import { categoryDefinitions } from "../lib/taxonomy";
           >{["fixed", "rolling", "periodic", "unknown", "none"].map((value) => <option value={value}>{value}</option>)}</select></label
         >
         <label
+          ><span class="text-sm font-medium">Application cycle details <span class="font-normal text-muted">(optional)</span></span><input
+            name="application_cycle"
+            maxlength="500"
+            placeholder="e.g. Monthly awards; applications accepted continuously"
+            class="mt-1 min-h-11 w-full rounded-md border border-line px-3"
+          /></label
+        >
+        <label
           ><span class="text-sm font-medium">Closing date <span class="font-normal text-muted">(fixed deadlines only)</span></span><input
             type="date"
             name="deadline"

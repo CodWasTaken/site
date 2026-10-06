@@ -21,6 +21,7 @@ const payload: PublicationPayload = {
   availability_status: "open",
   status_reason: "The application page is accepting submissions.",
   deadline_type: "fixed",
+  application_cycle: "2026 grant cycle",
   deadline: "2026-12-01",
   global: false,
   remote: true,
@@ -56,6 +57,7 @@ test("v2 publication survives the site display adapter without flattening semant
   assert.equal(listing.officialUrl, payload.application_url);
   assert.equal(listing.deadline, payload.deadline);
   assert.equal(listing.deadlineType, "fixed");
+  assert.equal(listing.applicationCycle, "2026 grant cycle");
   assert.deepEqual(listing.countries, ["PL", "DE"]);
   assert.deepEqual(listing.regions, ["PL", "DE", "Remote"]);
   assert.deepEqual(listing.claimsChecked, payload.claims_checked);

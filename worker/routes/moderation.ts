@@ -298,6 +298,7 @@ const normalizedData = (value: unknown): Record<string, unknown> => {
     return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === date;
   };
   const deadline = text("deadline", 10, false);
+  const applicationCycle = text("application_cycle", 500, false);
   if (deadline && !validDate(deadline))
     throw new RequestError("Deadline is invalid.", 400, "validation_failed");
   if (deadlineType === "fixed" && !deadline)
@@ -354,6 +355,7 @@ const normalizedData = (value: unknown): Record<string, unknown> => {
     availability_status: availabilityStatus,
     status_reason: text("status_reason", 1_000, false),
     deadline_type: deadlineType,
+    application_cycle: applicationCycle,
     global: triState("global"),
     remote: triState("remote"),
     countries,
@@ -407,6 +409,7 @@ interface ExportedListing {
   applicationUrl?: string | null;
   deadline?: string | null;
   deadlineType?: string | null;
+  applicationCycle?: string | null;
   global?: boolean | null;
   remote?: boolean | null;
   countries?: string[];
@@ -604,6 +607,7 @@ export async function publishedReviewListings(
     applicationUrl: listing.applicationUrl ?? null,
     deadline: listing.deadline ?? null,
     deadlineType: listing.deadlineType ?? null,
+    applicationCycle: listing.applicationCycle ?? null,
     canonicalUrl: `/opportunities/${listing.id}/`,
   }));
   const nextOffset = offset + page.length;
@@ -732,6 +736,7 @@ const canonicalActionNormalized = (
       availability_status: listing.status,
       status_reason: listing.statusReason ?? "",
       deadline_type: listing.deadlineType ?? (listing.deadline ? "fixed" : "unknown"),
+      application_cycle: listing.applicationCycle ?? "",
       global: listing.global ?? "unknown",
       remote: listing.remote ?? "unknown",
       countries: listing.countries ?? [],

@@ -91,4 +91,24 @@ test("greenfield generator includes canonical promotion reconciliation", async (
     generator,
     /supabase\/migrations\/202609270001_canonical_promotion_reconciliation\.sql/,
   );
+  assert.match(
+    generator,
+    /supabase\/migrations\/202610060001_structured_application_cycle\.sql/,
+  );
+});
+
+test("structured application-cycle migration preserves cadence through moderation and publication", async () => {
+  const sql = await readFile(
+    join(root, "supabase/migrations/202610060001_structured_application_cycle.sql"),
+    "utf8",
+  );
+  assert.match(sql, /add column if not exists application_cycle text/);
+  assert.match(sql, /p_normalized->>'application_cycle'/);
+  assert.match(sql, /application_cycle = excluded\.application_cycle/);
+  assert.match(sql, /normalized\.application_cycle/);
+  assert.match(sql, /application_cycle text/);
+  assert.match(sql, /grant execute on function public\.publication_batch_payload\(uuid\)[\s\S]*to service_role/i);
+  assert.doesNotMatch(sql, /security definer\s+set search_path = public/i);
+  assert.match(sql, /security definer\s+set search_path = ''/i);
+  assert.doesNotMatch(sql, /grant execute[\s\S]*to (?:anon|authenticated)/i);
 });

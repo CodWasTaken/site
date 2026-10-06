@@ -25,6 +25,7 @@ const payload: PublicationPayload = {
   availability_status: "open",
   status_reason: "Applications are open on the provider site.",
   deadline_type: "fixed",
+  application_cycle: "2026 grant cycle",
   deadline: "2026-12-01",
   global: true,
   remote: true,
@@ -83,6 +84,7 @@ test("publication data uses stable IDs and the public data schema", () => {
   assert.equal(published.availability.status, "open");
   assert.equal(published.classification.defaultSearchEligible, true);
   assert.equal(published.availability.closesAt, "2026-12-01");
+  assert.equal(published.availability.applicationCycle, "2026 grant cycle");
   assert.equal(published.geography.global, true);
   assert.deepEqual(published.reviewProvenance.claimsChecked, payload.claims_checked);
   assert.equal(published.reviewProvenance.reviewerReference, "role:moderator");

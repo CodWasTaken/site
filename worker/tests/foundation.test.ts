@@ -388,6 +388,7 @@ const canonicalModerationListing = (overrides: Record<string, unknown> = {}) => 
   applicationUrl: "https://example.org/grant/apply",
   deadline: null,
   deadlineType: "none",
+  applicationCycle: "Applications remain open throughout the year.",
   global: true,
   remote: true,
   countries: [],
@@ -508,6 +509,7 @@ test("quick verify creates and approves an audited canonical listing update", as
     assert.equal(normalized.availability_status, "open");
     assert.equal(normalized.next_review_at, "2027-01-15");
     assert.equal(normalized.application_url, "https://example.org/grant/apply");
+    assert.equal(normalized.application_cycle, "Applications remain open throughout the year.");
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -705,6 +705,7 @@ function fillApprovalForm(
     "location",
     "deadline",
     "deadline_type",
+    "application_cycle",
     "resource_type",
     "default_search_eligible",
     "availability_status",
@@ -761,6 +762,7 @@ function populateApproval() {
           location: submission.location,
           deadline: submission.deadline,
           deadline_type: submission.deadline ? "fixed" : "unknown",
+          application_cycle: "",
           resource_type: "",
           default_search_eligible: "",
           availability_status: "",
@@ -819,6 +821,7 @@ async function openListingUpdate(id: string) {
         deadline: listing.deadline ?? "",
         deadline_type:
           listing.deadlineType ?? (listing.deadline ? "fixed" : "unknown"),
+        application_cycle: listing.applicationCycle ?? "",
         resource_type: listing.resourceType ?? "opportunity",
         default_search_eligible:
           typeof listing.defaultSearchEligible === "boolean"
@@ -1230,6 +1233,7 @@ element<HTMLFormElement>("#approve-form").addEventListener(
         availability_status: data.get("availability_status"),
         status_reason: data.get("status_reason"),
         deadline_type: data.get("deadline_type"),
+        application_cycle: data.get("application_cycle"),
         global: data.get("global"),
         remote: data.get("remote"),
         countries,

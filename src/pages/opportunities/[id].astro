@@ -30,7 +30,11 @@ const { listing } = Astro.props as { listing: Listing };
 const turnstileKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY;
 const isV2 = listing.schemaVersion === "2.0";
 const destinationUrl = listing.applicationUrl ?? listing.programUrl ?? listing.officialUrl;
-const destinationLabel = listing.applicationUrl ? "Application page" : "Program details";
+const destinationLabel = listing.applicationUrl
+  ? listing.status === "waitlist"
+    ? "Join waitlist"
+    : "Application page"
+  : "Program details";
 const reviewDateLabel = listing.reviewDate ? formatDate(listing.reviewDate) : null;
 ---
 
@@ -193,6 +197,7 @@ const reviewDateLabel = listing.reviewDate ? formatDate(listing.reviewDate) : nu
           </div>{isV2 && <div>
             <dt class="flex items-center gap-2 text-muted"><CalendarDays size={16} /> Application window</dt>
             <dd class="mt-1.5 font-medium">{deadlineLabel(listing)}</dd>
+            {listing.applicationCycle && <dd class="mt-1 text-xs leading-5 text-muted">{listing.applicationCycle}</dd>}
           </div>}<div>
             <dt class="flex items-center gap-2 text-muted">
               <Globe2 size={16} /> Region

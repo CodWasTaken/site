@@ -55,6 +55,7 @@ export interface Listing {
   evidenceUrls?: ListingEvidence[];
   deadline?: string | null;
   deadlineType?: string | null;
+  applicationCycle?: string | null;
   global?: boolean | null;
   remote?: boolean | null;
   countries?: string[];
@@ -211,6 +212,8 @@ export function normalizeListingRecord(
       typeof availability.closesAt === "string" ? availability.closesAt : null;
     const deadlineType =
       typeof availability.deadlineType === "string" ? availability.deadlineType : null;
+    const applicationCycle =
+      typeof availability.applicationCycle === "string" ? availability.applicationCycle : null;
     const global = typeof geography.global === "boolean" ? geography.global : null;
     const remote = typeof geography.remote === "boolean" ? geography.remote : null;
     const sponsorshipType = typeof sponsorship.sponsorshipType === "string"
@@ -271,6 +274,7 @@ export function normalizeListingRecord(
       evidenceUrls,
       deadline,
       deadlineType,
+      applicationCycle,
       global,
       remote,
       countries,

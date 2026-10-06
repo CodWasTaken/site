@@ -63,4 +63,6 @@ test("greenfield migration is private, Supabase-specific, and generated once", a
   assert.equal((sql.match(/^commit;$/gim) ?? []).length, 1);
   assert.doesNotMatch(sql, /github\.com\/PerkCommons\/(?:site|data|docs|branding)/);
   assert.doesNotMatch(sql, /(?:gh[pousr]_|AKIA)[A-Za-z0-9_-]{12,}/);
+  assert.match(sql, /application_cycle text/);
+  assert.match(sql, /normalized\.application_cycle/);
 });

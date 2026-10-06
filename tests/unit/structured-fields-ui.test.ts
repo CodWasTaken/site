@@ -16,9 +16,11 @@ test("deadline labels distinguish fixed, rolling, periodic, none, and unresolved
 test("listing detail uses neutral application wording and exposes structured application windows", async () => {
   const page = await read("../../src/pages/opportunities/[id].astro");
   assert.match(page, /Application page/);
+  assert.match(page, /Join waitlist/);
   assert.doesNotMatch(page, /Open application/);
   assert.match(page, /Application window/);
   assert.match(page, /deadlineLabel\(listing\)/);
+  assert.match(page, /listing\.applicationCycle/);
   assert.match(page, /Add deadline to calendar/);
 });
 
@@ -33,6 +35,8 @@ test("moderator review cards expose structured-field completeness", async () => 
   assert.match(controller, /Application page linked/);
   assert.match(controller, /Application page not structured/);
   assert.match(controller, /Deadline not structured/);
+  assert.match(controller, /Cycle details not structured/);
   assert.match(route, /deadlineType: listing\.deadlineType/);
+  assert.match(route, /applicationCycle: listing\.applicationCycle/);
   assert.match(route, /deadline: listing\.deadline/);
 });
