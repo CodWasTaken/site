@@ -13,13 +13,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: CodWasTaken/data
-          ref: next/schema-v2
+          ref: 28873d3d56f791843bb5bf974940e53fed8316be
           path: .data
+      - name: Verify canonical data snapshot
+        working-directory: .data
+        run: test "$(git rev-parse HEAD)" = "28873d3d56f791843bb5bf974940e53fed8316be"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - name: Validate release data branch
+      - name: Validate canonical data snapshot
         working-directory: .data
         run: |
           npm ci
