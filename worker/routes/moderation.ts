@@ -314,9 +314,27 @@ const normalizedData = (value: unknown): Record<string, unknown> => {
   if (nextReviewAt && !validDate(nextReviewAt))
     throw new RequestError("Next review date is invalid.", 400, "validation_failed");
   const location = text("location", 120, false);
-  const physicalLocations = location && !["global", "remote", "online"].includes(location.toLowerCase())
-    ? [location]
-    : [];
+  const physicalLocationInput = normalized.physical_locations;
+  if (
+    physicalLocationInput !== undefined &&
+    (
+      !Array.isArray(physicalLocationInput) ||
+      physicalLocationInput.length > 20 ||
+      physicalLocationInput.some(
+        (item) =>
+          typeof item !== "string" ||
+          item.trim().length < 2 ||
+          item.trim().length > 200,
+      ) ||
+      new Set(physicalLocationInput).size !== physicalLocationInput.length
+    )
+  )
+    throw new RequestError("Physical locations are invalid.", 400, "validation_failed");
+  const physicalLocations = Array.isArray(physicalLocationInput)
+    ? physicalLocationInput.map((item) => String(item).trim())
+    : location && !["global", "remote", "online"].includes(location.toLowerCase())
+      ? [location]
+      : [];
   return {
     title: text("title", 140),
     organization: text("organization", 100),
@@ -368,6 +386,7 @@ interface CatalogSummary {
 }
 
 interface ExportedListing {
+  schemaVersion?: "1" | "2.0";
   id: string;
   provider: string;
   title: string;
@@ -391,11 +410,19 @@ interface ExportedListing {
   global?: boolean | null;
   remote?: boolean | null;
   countries?: string[];
+  physicalLocations?: string[];
   regions?: string[];
+  statusReason?: string | null;
   reviewedAt?: string | null;
   nextReviewAt?: string | null;
   claimsChecked?: string[];
   sponsor?: boolean;
+  sponsorshipType?: string | null;
+  sponsorshipDisclosure?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  editorialReviewState?: string;
+  verified?: boolean;
 }
 
 const staticRecords = async <T>(
@@ -504,6 +531,89 @@ export async function unconfirmedListings(
   });
 }
 
+export async function publishedReviewListings(
+  request: Request,
+  env: Env,
+): Promise<Response> {
+  await requireModerator(request, env);
+  const url = new URL(request.url);
+  const categoryParameter = url.searchParams.get("category");
+  const category = categoryParameter
+    ? normalizeCategoryId(categoryParameter)
+    : null;
+  if (categoryParameter && !category)
+    throw new RequestError(
+      "Unknown opportunity category.",
+      400,
+      "invalid_category",
+    );
+  const search = (url.searchParams.get("search") ?? "").trim().toLowerCase();
+  if (search.length > 120)
+    throw new RequestError("Search is too long.", 400, "validation_failed");
+  const limit = Math.min(
+    50,
+    Math.max(
+      1,
+      Number.parseInt(url.searchParams.get("limit") ?? "25", 10) || 25,
+    ),
+  );
+  const offset = queueCursor(url.searchParams.get("cursor"));
+  const [records, removedRows] = await Promise.all([
+    staticRecords<ExportedListing>(request, env, "/data/opportunities.json"),
+    supabaseRequest<Array<{ listing_id: string }>>(
+      env,
+      "/rest/v1/listing_moderation_state?removed=eq.true&select=listing_id&limit=5000",
+    ).then((result) => result.data),
+  ]);
+  const removed = new Set(removedRows.map((row) => row.listing_id));
+  const filtered = records
+    .filter((record) => !removed.has(record.id))
+    .filter((record) => !category || record.category === category)
+    .filter(
+      (record) =>
+        !search ||
+        [record.id, record.provider, record.title, record.description, record.value]
+          .filter((field): field is string => typeof field === "string")
+          .some((field) => field.toLowerCase().includes(search)),
+    )
+    .sort((left, right) => {
+      const leftReviewed = left.reviewedAt?.slice(0, 10) ?? "";
+      const rightReviewed = right.reviewedAt?.slice(0, 10) ?? "";
+      if (!leftReviewed && rightReviewed) return -1;
+      if (leftReviewed && !rightReviewed) return 1;
+      const dateOrder = leftReviewed.localeCompare(rightReviewed);
+      if (dateOrder) return dateOrder;
+      return (
+        left.title.localeCompare(right.title) ||
+        left.provider.localeCompare(right.provider) ||
+        left.id.localeCompare(right.id)
+      );
+    });
+  const page = filtered.slice(offset, offset + limit).map((listing) => ({
+    id: listing.id,
+    provider: listing.provider,
+    title: listing.title,
+    category: listing.category,
+    status: listing.status,
+    reviewDate: listing.reviewDate,
+    reviewedAt: listing.reviewedAt ?? null,
+    nextReviewAt: listing.nextReviewAt ?? null,
+    editorialReviewState: listing.editorialReviewState ?? "unconfirmed",
+    verified: listing.verified === true,
+    programUrl: listing.programUrl ?? listing.sourceUrl,
+    applicationUrl: listing.applicationUrl ?? null,
+    canonicalUrl: `/opportunities/${listing.id}/`,
+  }));
+  const nextOffset = offset + page.length;
+  return json({
+    queue: "published-review",
+    total: filtered.length,
+    count: page.length,
+    nextCursor: nextOffset < filtered.length ? btoa(String(nextOffset)) : null,
+    listings: page,
+  });
+}
+
 export async function canonicalListingDetail(
   request: Request,
   env: Env,
@@ -564,6 +674,314 @@ export async function createListingUpdate(
         "Listing update queued for human review. It will not change Git until separately approved and published.",
       submission_id: submissionId,
       target_listing_id: validId,
+    },
+    202,
+  );
+}
+
+const canonicalActionClaims = (
+  body: Record<string, unknown>,
+): string[] => {
+  const value = body.claims_checked;
+  if (!Array.isArray(value))
+    throw new RequestError("Claims checked are invalid.", 400, "validation_failed");
+  return value.map(String);
+};
+
+const canonicalActionNormalized = (
+  listing: ExportedListing,
+  claimsChecked: string[],
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> => {
+  if (listing.schemaVersion !== "2.0")
+    throw new RequestError(
+      "This legacy listing needs the full edit workflow before it can be reviewed.",
+      409,
+      "full_review_required",
+    );
+  if (typeof listing.defaultSearchEligible !== "boolean")
+    throw new RequestError(
+      "Default-search eligibility must be resolved in the full edit workflow first.",
+      409,
+      "full_review_required",
+    );
+  const programUrl = listing.programUrl ?? listing.sourceUrl ?? listing.officialUrl;
+  const location = listing.global === true
+    ? "Global"
+    : listing.remote === true
+      ? "Remote"
+      : listing.physicalLocations?.[0] ?? "";
+  return normalizedData({
+    normalized: {
+      title: listing.title,
+      organization: listing.provider,
+      primary_category: listing.category,
+      categories: [listing.category],
+      subcategories: listing.subcategories,
+      tags: listing.tags,
+      description: listing.description,
+      eligibility: listing.eligibility,
+      benefits: listing.value,
+      location,
+      physical_locations: listing.physicalLocations ?? [],
+      deadline: listing.deadline ?? "",
+      resource_type: listing.resourceType ?? "opportunity",
+      default_search_eligible: listing.defaultSearchEligible,
+      availability_status: listing.status,
+      status_reason: listing.statusReason ?? "",
+      deadline_type: listing.deadlineType ?? (listing.deadline ? "fixed" : "unknown"),
+      global: listing.global ?? "unknown",
+      remote: listing.remote ?? "unknown",
+      countries: listing.countries ?? [],
+      program_url: programUrl,
+      provider_url: listing.providerUrl ?? "",
+      application_url: listing.applicationUrl ?? "",
+      claims_checked: claimsChecked,
+      next_review_at: listing.nextReviewAt ?? "",
+      sponsored: typeof listing.sponsor === "boolean" ? listing.sponsor : "unknown",
+      sponsorship_type: listing.sponsorshipType ?? "",
+      sponsorship_disclosure: listing.sponsorshipDisclosure ?? "",
+      ...overrides,
+    },
+  });
+};
+
+const ensureNoActiveListingUpdate = async (env: Env, id: string): Promise<void> => {
+  const { data } = await supabaseRequest<Array<{ id: string }>>(
+    env,
+    `/rest/v1/opportunity_submissions?submission_kind=eq.listing_update&target_listing_id=eq.${encodeURIComponent(id)}&status=in.(pending,reviewing,flagged,approved)&select=id&limit=1`,
+  );
+  if (data[0])
+    throw new RequestError(
+      "This listing already has an update awaiting review or publication.",
+      409,
+      "listing_update_pending",
+    );
+};
+
+const reviewedCanonicalUpdate = async (
+  env: Env,
+  moderator: Moderator,
+  listing: ExportedListing,
+  normalized: Record<string, unknown>,
+  reason: string,
+): Promise<{ submissionId: string; actionId: string }> => {
+  await ensureNoActiveListingUpdate(env, listing.id);
+  const originalCreatedAt =
+    listing.createdAt ??
+    listing.reviewedAt ??
+    (listing.reviewDate ? `${listing.reviewDate}T00:00:00.000Z` : null);
+  if (!originalCreatedAt || Number.isNaN(new Date(originalCreatedAt).valueOf()))
+    throw new RequestError(
+      "The listing creation provenance needs a full edit before quick review.",
+      409,
+      "full_review_required",
+    );
+  const submissionId = await callRpc<string>(env, "create_listing_update", {
+    p_moderator_id: moderator.userId,
+    p_target_listing_id: listing.id,
+    p_original_created_at: originalCreatedAt,
+    p_normalized: normalized,
+  });
+  const actionId = await callRpc<string>(env, "perform_moderation_action", {
+    p_submission_id: submissionId,
+    p_moderator_id: moderator.userId,
+    p_action: "approve",
+    p_reason: reason,
+    p_notes: null,
+    p_normalized: normalized,
+  });
+  return { submissionId, actionId };
+};
+
+const canonicalListingForAction = async (
+  request: Request,
+  env: Env,
+  id: string,
+): Promise<ExportedListing> => {
+  const validId = listingId(id);
+  const records = await staticRecords<ExportedListing>(
+    request,
+    env,
+    "/data/opportunities.json",
+  );
+  const listing = records.find((record) => record.id === validId);
+  if (!listing)
+    throw new RequestError("Listing was not found.", 404, "not_found");
+  return listing;
+};
+
+export async function verifyCanonicalListing(
+  request: Request,
+  env: Env,
+  id: string,
+): Promise<Response> {
+  assertSameOrigin(request);
+  const moderator = await requireModerator(request, env);
+  const listing = await canonicalListingForAction(request, env, id);
+  const body = asRecord(await readJson(request, 8_000));
+  const claimsChecked = canonicalActionClaims(body);
+  const nextReviewAt = typeof body.next_review_at === "string"
+    ? body.next_review_at.trim()
+    : listing.nextReviewAt ?? "";
+  const blockedStatuses = new Set(["unconfirmed", "expired", "disputed", "archived"]);
+  if (blockedStatuses.has(listing.status))
+    throw new RequestError(
+      "Resolve the listing availability in the full edit workflow before verifying it.",
+      409,
+      "full_review_required",
+    );
+  const geographyKnown =
+    typeof listing.global === "boolean" ||
+    typeof listing.remote === "boolean" ||
+    Boolean(listing.countries?.length);
+  if (!geographyKnown)
+    throw new RequestError(
+      "Resolve geography in the full edit workflow before verifying this listing.",
+      409,
+      "full_review_required",
+    );
+  if (!nextReviewAt)
+    throw new RequestError(
+      "Choose the next review date before verifying this listing.",
+      400,
+      "validation_failed",
+    );
+  const requiredClaims = new Set(["program-exists", "eligibility", "geography"]);
+  if (listing.applicationUrl) requiredClaims.add("application-url");
+  if (listing.deadlineType === "fixed" && listing.deadline)
+    requiredClaims.add("deadline");
+  const missingClaims = [...requiredClaims].filter((claim) => !claimsChecked.includes(claim));
+  if (missingClaims.length)
+    throw new RequestError(
+      `Verify the required claims first: ${missingClaims.join(", ")}.`,
+      400,
+      "verification_incomplete",
+    );
+  const normalized = canonicalActionNormalized(listing, claimsChecked, {
+    next_review_at: nextReviewAt,
+  });
+  const result = await reviewedCanonicalUpdate(
+    env,
+    moderator,
+    listing,
+    normalized,
+    "Re-verified current published listing",
+  );
+  return json(
+    {
+      message:
+        "Verification recorded as an approved canonical update. An administrator can publish it in the next validated data batch.",
+      submission_id: result.submissionId,
+      action_id: result.actionId,
+      target_listing_id: listing.id,
+    },
+    202,
+  );
+}
+
+export async function markCanonicalListingInactive(
+  request: Request,
+  env: Env,
+  id: string,
+): Promise<Response> {
+  assertSameOrigin(request);
+  const moderator = await requireModerator(request, env);
+  const listing = await canonicalListingForAction(request, env, id);
+  const body = asRecord(await readJson(request, 8_000));
+  const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+  if (reason.length < 4 || reason.length > 1_000)
+    throw new RequestError(
+      "Explain why the listing is being marked inactive.",
+      400,
+      "validation_failed",
+    );
+  const claimsChecked = canonicalActionClaims(body);
+  const normalized = canonicalActionNormalized(listing, claimsChecked, {
+    availability_status: "archived",
+    default_search_eligible: false,
+    status_reason: reason,
+    next_review_at:
+      typeof body.next_review_at === "string"
+        ? body.next_review_at.trim()
+        : listing.nextReviewAt ?? "",
+  });
+  const result = await reviewedCanonicalUpdate(
+    env,
+    moderator,
+    listing,
+    normalized,
+    "Marked current listing inactive after moderator review",
+  );
+  return json(
+    {
+      message:
+        "Inactive state recorded as an approved canonical update. It will leave default discovery after the validated data batch is published.",
+      submission_id: result.submissionId,
+      action_id: result.actionId,
+      target_listing_id: listing.id,
+    },
+    202,
+  );
+}
+
+export async function removeCanonicalListing(
+  request: Request,
+  env: Env,
+  id: string,
+): Promise<Response> {
+  assertSameOrigin(request);
+  const moderator = await requireModerator(request, env);
+  const listing = await canonicalListingForAction(request, env, id);
+  const body = asRecord(await readJson(request, 8_000));
+  const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+  const notes = optionalNote(body.notes);
+  if (reason.length < 4 || reason.length > 240)
+    throw new RequestError("Removal reason is required.", 400, "validation_failed");
+  const reports = await insertRows<{ id: string }>(env, "listing_reports", {
+    listing_id: listing.id,
+    reason,
+    details: notes
+      ? `Moderator-initiated removal. ${notes}`
+      : "Moderator-initiated removal from the canonical review workflow.",
+    status: "open",
+    assigned_to: moderator.userId,
+  });
+  const reportId = reports[0]?.id;
+  if (!reportId)
+    throw new RequestError("Removal could not be recorded.", 500, "removal_failed");
+  const listingIdValue = await callRpc<string>(env, "resolve_listing_report", {
+    p_report_id: reportId,
+    p_moderator_id: moderator.userId,
+    p_decision: "upheld",
+    p_notes: notes ?? reason,
+  });
+  await deleteListingStateCache(listingIdValue);
+  let removalBatch = null;
+  try {
+    removalBatch = await prepareListingRemovalForReport(env, reportId);
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: "moderator_listing_removal_prepare_failed",
+        report_id: reportId,
+        listing_id: listing.id,
+        error: error instanceof Error ? error.name : "unknown",
+      }),
+    );
+  }
+  return json(
+    {
+      message:
+        "Listing suppressed immediately and queued for validated removal from the public dataset.",
+      listing_id: listingIdValue,
+      report_id: reportId,
+      removal: removalBatch
+        ? {
+            status: removalBatch.status,
+            pull_request_url: removalBatch.github_pr_url,
+          }
+        : null,
     },
     202,
   );
@@ -666,7 +1084,7 @@ export async function resolveReport(
     p_decision: decision,
     p_notes: optionalNote(body.notes),
   });
-  await caches.default.delete(listingStateCacheRequest(listingId));
+  await deleteListingStateCache(listingId);
   let removalBatch = null;
   if (decision === "upheld") {
     try {
@@ -705,6 +1123,19 @@ const listingId = (value: string): string => {
 const listingStateCacheRequest = (id: string) =>
   new Request(`https://perkcommons.com/__listing-state-cache/${id}`);
 
+type EdgeCache = Pick<Cache, "match" | "put" | "delete">;
+const listingStateCache = (): EdgeCache | null => {
+  const runtime = globalThis as typeof globalThis & {
+    caches?: CacheStorage & { default?: EdgeCache };
+  };
+  return runtime.caches?.default ?? null;
+};
+
+const deleteListingStateCache = async (id: string): Promise<void> => {
+  const cache = listingStateCache();
+  if (cache) await cache.delete(listingStateCacheRequest(id));
+};
+
 export async function isListingRemoved(env: Env, id: string): Promise<boolean> {
   const validId = listingId(id);
   if (env.TOMBSTONE_STORE) {
@@ -712,7 +1143,8 @@ export async function isListingRemoved(env: Env, id: string): Promise<boolean> {
     if (tombstone !== null) return true;
   }
   const cacheKey = listingStateCacheRequest(validId);
-  const cached = await caches.default.match(cacheKey);
+  const cache = listingStateCache();
+  const cached = cache ? await cache.match(cacheKey) : undefined;
   if (cached) return (await cached.text()) === "removed";
   try {
     const { data } = await supabaseRequest<Array<{ listing_id: string }>>(
@@ -720,12 +1152,13 @@ export async function isListingRemoved(env: Env, id: string): Promise<boolean> {
       `/rest/v1/listing_moderation_state?listing_id=eq.${encodeURIComponent(validId)}&removed=eq.true&select=listing_id&limit=1`,
     );
     const removed = Boolean(data[0]);
-    await caches.default.put(
-      cacheKey,
-      new Response(removed ? "removed" : "visible", {
-        headers: { "cache-control": "public, max-age=60" },
-      }),
-    );
+    if (cache)
+      await cache.put(
+        cacheKey,
+        new Response(removed ? "removed" : "visible", {
+          headers: { "cache-control": "public, max-age=60" },
+        }),
+      );
     return removed;
   } catch (error) {
     // Static listings remain available during a database or migration outage.

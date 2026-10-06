@@ -15,6 +15,7 @@ export interface UnconfirmedListingSummary {
 }
 
 export interface CanonicalListing {
+  schemaVersion?: "1" | "2.0";
   id: string;
   provider: string;
   title: string;
@@ -38,11 +39,19 @@ export interface CanonicalListing {
   global?: boolean | null;
   remote?: boolean | null;
   countries?: string[];
+  physicalLocations?: string[];
   regions?: string[];
+  statusReason?: string | null;
   reviewedAt?: string | null;
   nextReviewAt?: string | null;
   claimsChecked?: string[];
   sponsor?: boolean;
+  sponsorshipType?: string | null;
+  sponsorshipDisclosure?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  editorialReviewState?: string;
+  verified?: boolean;
 }
 
 interface QueueResponse {

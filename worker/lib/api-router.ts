@@ -10,18 +10,22 @@ import {
   destroySession,
   featureListing,
   moderationAction,
+  markCanonicalListingInactive,
   moderationError,
   moderators,
   publicListingState,
+  publishedReviewListings,
   publications,
   purgeRejected,
   queue,
   queueSummary,
   removeBan,
+  removeCanonicalListing,
   reports,
   resolveReport,
   submissionDetail,
   unconfirmedListings,
+  verifyCanonicalListing,
 } from "../routes/moderation.js";
 import {
   handlePublicError,
@@ -38,6 +42,12 @@ const reportPattern = /^\/api\/moderation\/reports\/([0-9a-f-]+)\/resolve$/i;
 const featurePattern = /^\/api\/moderation\/listings\/([a-z0-9-]+)\/feature$/;
 const listingUpdatePattern =
   /^\/api\/moderation\/listings\/([a-z0-9-]+)\/updates$/;
+const listingVerifyPattern =
+  /^\/api\/moderation\/listings\/([a-z0-9-]+)\/verify$/;
+const listingInactivePattern =
+  /^\/api\/moderation\/listings\/([a-z0-9-]+)\/inactive$/;
+const listingRemovePattern =
+  /^\/api\/moderation\/listings\/([a-z0-9-]+)\/remove$/;
 const canonicalListingPattern =
   /^\/api\/moderation\/listings\/([a-z0-9-]+)$/;
 
@@ -151,6 +161,10 @@ export async function routeApiRequest(
       return request.method === "GET"
         ? await unconfirmedListings(request, env)
         : methodNotAllowed();
+    if (path === "/api/moderation/listings/review")
+      return request.method === "GET"
+        ? await publishedReviewListings(request, env)
+        : methodNotAllowed();
     if (path === "/api/moderation/moderators")
       return request.method === "GET" || request.method === "POST"
         ? await moderators(request, env)
@@ -174,6 +188,24 @@ export async function routeApiRequest(
     if (featureMatch?.[1])
       return request.method === "POST"
         ? await featureListing(request, env, featureMatch[1])
+        : methodNotAllowed();
+
+    const listingVerifyMatch = path.match(listingVerifyPattern);
+    if (listingVerifyMatch?.[1])
+      return request.method === "POST"
+        ? await verifyCanonicalListing(request, env, listingVerifyMatch[1])
+        : methodNotAllowed();
+
+    const listingInactiveMatch = path.match(listingInactivePattern);
+    if (listingInactiveMatch?.[1])
+      return request.method === "POST"
+        ? await markCanonicalListingInactive(request, env, listingInactiveMatch[1])
+        : methodNotAllowed();
+
+    const listingRemoveMatch = path.match(listingRemovePattern);
+    if (listingRemoveMatch?.[1])
+      return request.method === "POST"
+        ? await removeCanonicalListing(request, env, listingRemoveMatch[1])
         : methodNotAllowed();
 
     const listingUpdateMatch = path.match(listingUpdatePattern);

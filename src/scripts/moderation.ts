@@ -12,11 +12,15 @@ import {
   subcategoryLabel,
 } from "../lib/taxonomy";
 import {
+  createPublishedReviewController,
+} from "./moderation/published-review";
+import {
   createUnconfirmedQueueController,
   type CanonicalListing,
 } from "./moderation/unconfirmed";
 
 type QueueName =
+  | "review"
   | "pending"
   | "flagged"
   | "unconfirmed"
@@ -36,6 +40,7 @@ const workspace = element<HTMLElement>("#review-workspace");
 const reportsView = element<HTMLElement>("#reports-view");
 const archiveView = element<HTMLElement>("#archive-view");
 const unconfirmedView = element<HTMLElement>("#unconfirmed-view");
+const publishedReviewView = element<HTMLElement>("#published-review-view");
 const queueState = element<HTMLElement>("#queue-state");
 const actionBar = element<HTMLElement>("#review-actions");
 const card = element<HTMLElement>("#review-card");
@@ -54,6 +59,7 @@ let publicationTimer: number | undefined;
 let approvalMode: "submission" | "listing-update" = "submission";
 let listingUpdateTarget: CanonicalListing | null = null;
 let unconfirmedSearchTimer: number | undefined;
+let publishedReviewSearchTimer: number | undefined;
 
 interface PublicationBatch {
   id: string;
@@ -124,6 +130,15 @@ const unconfirmedController = createUnconfirmedQueueController({
   onCount: setQueueLabels,
 });
 
+const publishedReviewController = createPublishedReviewController({
+  api,
+  onEdit: (id) => void openListingUpdate(id),
+  onVerify: (id) => void openCanonicalVerification(id),
+  onInactive: (id) => void openCanonicalInactive(id),
+  onRemove: (id) => void openCanonicalRemoval(id),
+  onCount: setQueueLabels,
+});
+
 function setLoading(message = "Loading submissions...") {
   queueState.textContent = message;
   show(queueState, true);
@@ -131,17 +146,22 @@ function setLoading(message = "Loading submissions...") {
   show(reportsView, false);
   show(archiveView, false);
   show(unconfirmedView, false);
+  show(publishedReviewView, false);
   show(actionBar, false);
 }
 
 function setQueueLabels(count: number) {
   element("#queue-name").textContent =
-    activeQueue === "unconfirmed" ? "Unconfirmed listings" : titleCase(activeQueue);
+    activeQueue === "unconfirmed"
+      ? "Unconfirmed listings"
+      : activeQueue === "review"
+        ? "Published review"
+        : titleCase(activeQueue);
   element("#queue-count").textContent =
     `${count} ${
       activeQueue === "reports"
         ? "reports"
-        : activeQueue === "unconfirmed"
+        : activeQueue === "unconfirmed" || activeQueue === "review"
           ? "listings"
           : "submissions"
     }`;
@@ -259,6 +279,7 @@ function renderSubmission() {
   show(reportsView, false);
   show(archiveView, false);
   show(unconfirmedView, false);
+  show(publishedReviewView, false);
   show(workspace, true);
   const reviewable = activeQueue === "pending" || activeQueue === "flagged";
   show(actionBar, reviewable);
@@ -386,6 +407,7 @@ function renderReports(reports: Array<Record<string, unknown>>) {
   show(reportsView, true);
   show(archiveView, false);
   show(unconfirmedView, false);
+  show(publishedReviewView, false);
   const list = element("#reports-list");
   list.replaceChildren();
   if (!reports.length) {
@@ -442,6 +464,7 @@ function renderArchive() {
   show(actionBar, false);
   show(archiveView, true);
   show(unconfirmedView, false);
+  show(publishedReviewView, false);
   setQueueLabels(submissions.length);
   const list = element("#archive-list");
   const purgeAll = element("#purge-rejected-button");
@@ -565,6 +588,10 @@ async function loadQueue(queueName: QueueName = activeQueue) {
     element("#unconfirmed-search-label"),
     queueName === "unconfirmed",
   );
+  show(
+    element("#published-review-search-label"),
+    queueName === "review",
+  );
   try {
     if (queueName === "reports") {
       const result = await api<{
@@ -580,6 +607,14 @@ async function loadQueue(queueName: QueueName = activeQueue) {
       await unconfirmedController.load(
         categoryFilter.value,
         element<HTMLInputElement>("#unconfirmed-search").value.trim(),
+      );
+      return;
+    }
+    if (queueName === "review") {
+      publishedReviewController.reset();
+      await publishedReviewController.load(
+        categoryFilter.value,
+        element<HTMLInputElement>("#published-review-search").value.trim(),
       );
       return;
     }
@@ -790,7 +825,7 @@ async function openListingUpdate(id: string) {
             ? String(listing.defaultSearchEligible)
             : "",
         availability_status: listing.status,
-        status_reason: "",
+        status_reason: listing.statusReason ?? "",
         global:
           typeof listing.global === "boolean" ? String(listing.global) : "unknown",
         remote:
@@ -805,8 +840,8 @@ async function openListingUpdate(id: string) {
           typeof listing.sponsor === "boolean"
             ? String(listing.sponsor)
             : "unknown",
-        sponsorship_type: "",
-        sponsorship_disclosure: "",
+        sponsorship_type: listing.sponsorshipType ?? "",
+        sponsorship_disclosure: listing.sponsorshipDisclosure ?? "",
       },
       listing.subcategories,
       listing.claimsChecked ?? [],
@@ -821,6 +856,75 @@ async function openListingUpdate(id: string) {
   } catch (error) {
     announcer.textContent =
       error instanceof Error ? error.message : "Could not open the listing.";
+  }
+}
+
+async function loadCanonicalListing(id: string): Promise<CanonicalListing> {
+  const result = await api<{ listing: CanonicalListing }>(
+    `/api/moderation/listings/${encodeURIComponent(id)}`,
+  );
+  return result.listing;
+}
+
+const setCheckedClaims = (form: HTMLFormElement, claims: string[]) => {
+  form
+    .querySelectorAll<HTMLInputElement>('input[name="claims_checked"]')
+    .forEach((input) => {
+      input.checked = claims.includes(input.value);
+    });
+};
+
+async function openCanonicalVerification(id: string) {
+  try {
+    const listing = await loadCanonicalListing(id);
+    const form = element<HTMLFormElement>("#verify-listing-form");
+    (form.elements.namedItem("listing_id") as HTMLInputElement).value = listing.id;
+    (form.elements.namedItem("next_review_at") as HTMLInputElement).value =
+      listing.nextReviewAt?.slice(0, 10) ?? "";
+    setCheckedClaims(form, []);
+    text(
+      "#verify-listing-description",
+      `Check the current provider evidence for ${listing.title} by ${listing.provider}. Saving records a new human verification timestamp and queues an already-approved canonical update for validated publication.`,
+    );
+    openDialog("#verify-listing-dialog");
+  } catch (error) {
+    announcer.textContent =
+      error instanceof Error ? error.message : "Could not open verification tools.";
+  }
+}
+
+async function openCanonicalInactive(id: string) {
+  try {
+    const listing = await loadCanonicalListing(id);
+    const form = element<HTMLFormElement>("#inactive-listing-form");
+    (form.elements.namedItem("listing_id") as HTMLInputElement).value = listing.id;
+    (form.elements.namedItem("reason") as HTMLTextAreaElement).value = "";
+    setCheckedClaims(form, []);
+    text(
+      "#inactive-listing-description",
+      `Keep ${listing.title} in the public audit trail but mark it Inactive and remove it from default discovery after the next validated publication.`,
+    );
+    openDialog("#inactive-listing-dialog");
+  } catch (error) {
+    announcer.textContent =
+      error instanceof Error ? error.message : "Could not open inactive controls.";
+  }
+}
+
+async function openCanonicalRemoval(id: string) {
+  try {
+    const listing = await loadCanonicalListing(id);
+    const form = element<HTMLFormElement>("#remove-listing-form");
+    (form.elements.namedItem("listing_id") as HTMLInputElement).value = listing.id;
+    (form.elements.namedItem("notes") as HTMLTextAreaElement).value = "";
+    text(
+      "#remove-listing-description",
+      `Remove ${listing.title} by ${listing.provider}. This is for listings that should no longer remain published at all; use Inactive when preserving the record is preferable.`,
+    );
+    openDialog("#remove-listing-dialog");
+  } catch (error) {
+    announcer.textContent =
+      error instanceof Error ? error.message : "Could not open removal controls.";
   }
 }
 
@@ -1025,6 +1129,23 @@ element<HTMLInputElement>("#unconfirmed-search").addEventListener(
     }, 250);
   },
 );
+element("#load-more-published-review").addEventListener("click", () =>
+  void publishedReviewController.load(
+    categoryFilter.value,
+    element<HTMLInputElement>("#published-review-search").value.trim(),
+    true,
+  ),
+);
+element<HTMLInputElement>("#published-review-search").addEventListener(
+  "input",
+  () => {
+    if (publishedReviewSearchTimer !== undefined)
+      window.clearTimeout(publishedReviewSearchTimer);
+    publishedReviewSearchTimer = window.setTimeout(() => {
+      if (activeQueue === "review") void loadQueue("review");
+    }, 250);
+  },
+);
 element("#logout-button").addEventListener("click", async () => {
   await api("/api/auth/logout", { method: "POST", body: "{}" });
   location.assign("/moderator-login/");
@@ -1150,6 +1271,98 @@ element<HTMLSelectElement>("#approval-category").addEventListener(
       (event.currentTarget as HTMLSelectElement).value,
     ),
 );
+element<HTMLFormElement>("#verify-listing-form").addEventListener(
+  "submit",
+  async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget as HTMLFormElement;
+    if (!form.reportValidity()) return;
+    const data = new FormData(form);
+    const id = String(data.get("listing_id") ?? "");
+    if (!id) return;
+    try {
+      const result = await api<{ message: string }>(
+        `/api/moderation/listings/${encodeURIComponent(id)}/verify`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            claims_checked: data.getAll("claims_checked").map(String),
+            next_review_at: data.get("next_review_at"),
+          }),
+        },
+      );
+      closeDialogs();
+      announcer.textContent = result.message;
+      await loadQueue("review");
+    } catch (error) {
+      announcer.textContent =
+        error instanceof Error ? error.message : "Verification could not be saved.";
+    }
+  },
+);
+
+element<HTMLFormElement>("#inactive-listing-form").addEventListener(
+  "submit",
+  async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget as HTMLFormElement;
+    if (!form.reportValidity()) return;
+    const data = new FormData(form);
+    const id = String(data.get("listing_id") ?? "");
+    if (!id) return;
+    try {
+      const result = await api<{ message: string }>(
+        `/api/moderation/listings/${encodeURIComponent(id)}/inactive`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            reason: data.get("reason"),
+            claims_checked: data.getAll("claims_checked").map(String),
+          }),
+        },
+      );
+      closeDialogs();
+      announcer.textContent = result.message;
+      await loadQueue("review");
+    } catch (error) {
+      announcer.textContent =
+        error instanceof Error ? error.message : "Inactive state could not be saved.";
+    }
+  },
+);
+
+element<HTMLFormElement>("#remove-listing-form").addEventListener(
+  "submit",
+  async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget as HTMLFormElement;
+    if (!form.reportValidity()) return;
+    const data = new FormData(form);
+    const id = String(data.get("listing_id") ?? "");
+    if (!id) return;
+    if (!confirm("Suppress this listing now and queue validated removal from PerkCommons/data?"))
+      return;
+    try {
+      const result = await api<{ message: string }>(
+        `/api/moderation/listings/${encodeURIComponent(id)}/remove`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            reason: data.get("reason"),
+            notes: data.get("notes"),
+          }),
+        },
+      );
+      closeDialogs();
+      announcer.textContent = result.message;
+      await loadQueue("review");
+    } catch (error) {
+      announcer.textContent =
+        error instanceof Error ? error.message : "Listing removal could not be started.";
+    }
+  },
+);
+
 element<HTMLFormElement>("#decline-form").addEventListener(
   "submit",
   (event) => {
@@ -1419,7 +1632,31 @@ async function initialize() {
         item.classList.remove("hidden");
         item.classList.add("flex");
       });
-    await loadQueue();
+    const params = new URLSearchParams(location.search);
+    const requestedQueue = params.get("queue");
+    const validQueues = new Set<QueueName>([
+      "review",
+      "pending",
+      "flagged",
+      "unconfirmed",
+      "approved",
+      "rejected",
+      "published",
+      "reports",
+    ]);
+    await loadQueue(
+      requestedQueue && validQueues.has(requestedQueue as QueueName)
+        ? (requestedQueue as QueueName)
+        : "pending",
+    );
+    const listingId = params.get("listing");
+    const action = params.get("action");
+    if (listingId && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(listingId)) {
+      if (action === "edit") await openListingUpdate(listingId);
+      else if (action === "verify") await openCanonicalVerification(listingId);
+      else if (action === "inactive") await openCanonicalInactive(listingId);
+      else if (action === "remove") await openCanonicalRemoval(listingId);
+    }
   } catch (error) {
     if (location.pathname.startsWith("/moderate"))
       announcer.textContent =

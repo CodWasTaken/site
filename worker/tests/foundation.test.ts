@@ -361,3 +361,230 @@ test("listing edits create an audited pending update instead of mutating the sta
     globalThis.fetch = originalFetch;
   }
 });
+
+const canonicalModerationListing = (overrides: Record<string, unknown> = {}) => ({
+  schemaVersion: "2.0",
+  id: "existing-grant",
+  provider: "Example Foundation",
+  title: "Existing Grant",
+  category: "funding",
+  subcategories: ["research-funding"],
+  tags: ["open-source"],
+  description: "An established funding opportunity for maintainers and research teams.",
+  eligibility: "Open-source maintainers and eligible research teams may apply.",
+  value: "$1,000 in funding.",
+  sourceUrl: "https://example.org/grant",
+  officialUrl: "https://example.org/grant/apply",
+  status: "open",
+  statusReason: "Applications are currently open.",
+  reviewDate: "2026-01-01",
+  reviewedAt: "2026-01-01T12:00:00Z",
+  nextReviewAt: "2026-12-01",
+  createdAt: "2025-01-01T00:00:00Z",
+  resourceType: "funding",
+  defaultSearchEligible: true,
+  providerUrl: "https://example.org",
+  programUrl: "https://example.org/grant",
+  applicationUrl: "https://example.org/grant/apply",
+  deadline: null,
+  deadlineType: "none",
+  global: true,
+  remote: true,
+  countries: [],
+  physicalLocations: [],
+  claimsChecked: ["program-exists", "eligibility", "benefit", "application-url", "geography"],
+  sponsor: false,
+  sponsorshipType: null,
+  sponsorshipDisclosure: null,
+  editorialReviewState: "human-reviewed",
+  verified: true,
+  ...overrides,
+});
+
+test("published review queue sorts never-reviewed first, then oldest verification, then title", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    if (url.endsWith("/auth/v1/user"))
+      return Response.json({ id: "22222222-2222-4222-8222-222222222222", email: "moderator@example.org" });
+    if (url.includes("moderator_profiles")) return Response.json([{ role: "reviewer" }]);
+    if (url.includes("listing_moderation_state?removed=eq.true"))
+      return Response.json([{ listing_id: "removed-listing" }]);
+    throw new Error(`Unexpected request: ${url}`);
+  };
+  const records = [
+    canonicalModerationListing({ id: "same-zulu", title: "Zulu", reviewedAt: "2025-01-01T00:00:00Z" }),
+    canonicalModerationListing({ id: "never-zulu", title: "Zulu Never", reviewedAt: null, reviewDate: "" }),
+    canonicalModerationListing({ id: "oldest", title: "Oldest", reviewedAt: "2024-01-01T00:00:00Z" }),
+    canonicalModerationListing({ id: "never-alpha", title: "Alpha Never", reviewedAt: null, reviewDate: "" }),
+    canonicalModerationListing({ id: "same-alpha", title: "Alpha", reviewedAt: "2025-01-01T12:00:00Z" }),
+    canonicalModerationListing({ id: "removed-listing", title: "Removed", reviewedAt: "2023-01-01T00:00:00Z" }),
+  ];
+  const env = {
+    ...baseEnv,
+    ASSETS: {
+      fetch: async (request: Request) => {
+        assert.equal(new URL(request.url).pathname, "/data/opportunities.json");
+        return Response.json({ records });
+      },
+    },
+  } satisfies Env;
+  try {
+    const unauthorized = await worker.fetch(
+      new Request("https://fork.example/api/moderation/listings/review"),
+      env,
+    );
+    assert.equal(unauthorized.status, 401);
+    const response = await worker.fetch(
+      new Request("https://fork.example/api/moderation/listings/review?limit=25", {
+        headers: { cookie: "pc_moderator_session=test-session" },
+      }),
+      env,
+    );
+    assert.equal(response.status, 200);
+    const body = await response.json() as { total: number; listings: Array<{ id: string }> };
+    assert.equal(body.total, 5);
+    assert.deepEqual(body.listings.map((listing) => listing.id), [
+      "never-alpha",
+      "never-zulu",
+      "oldest",
+      "same-alpha",
+      "same-zulu",
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("quick verify creates and approves an audited canonical listing update", async () => {
+  const originalFetch = globalThis.fetch;
+  const rpcCalls: Array<{ name: string; body: Record<string, unknown> }> = [];
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    if (url.endsWith("/auth/v1/user"))
+      return Response.json({ id: "22222222-2222-4222-8222-222222222222", email: "moderator@example.org" });
+    if (url.includes("moderator_profiles")) return Response.json([{ role: "reviewer" }]);
+    if (url.includes("opportunity_submissions?submission_kind=eq.listing_update")) return Response.json([]);
+    if (url.endsWith("/rpc/create_listing_update")) {
+      rpcCalls.push({ name: "create_listing_update", body: JSON.parse(String(init?.body)) });
+      return Response.json("11111111-1111-4111-8111-111111111111");
+    }
+    if (url.endsWith("/rpc/perform_moderation_action")) {
+      rpcCalls.push({ name: "perform_moderation_action", body: JSON.parse(String(init?.body)) });
+      return Response.json("33333333-3333-4333-8333-333333333333");
+    }
+    throw new Error(`Unexpected request: ${url}`);
+  };
+  const env = {
+    ...baseEnv,
+    ASSETS: { fetch: async () => Response.json({ records: [canonicalModerationListing()] }) },
+  } satisfies Env;
+  try {
+    const response = await worker.fetch(
+      new Request("https://fork.example/api/moderation/listings/existing-grant/verify", {
+        method: "POST",
+        headers: {
+          cookie: "pc_moderator_session=test-session",
+          origin: "https://fork.example",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          claims_checked: ["program-exists", "eligibility", "benefit", "application-url", "geography"],
+          next_review_at: "2027-01-15",
+        }),
+      }),
+      env,
+    );
+    assert.equal(response.status, 202);
+    assert.deepEqual(rpcCalls.map((call) => call.name), ["create_listing_update", "perform_moderation_action"]);
+    assert.equal(rpcCalls[1]?.body.p_action, "approve");
+    const normalized = rpcCalls[0]?.body.p_normalized as Record<string, unknown>;
+    assert.equal(normalized.availability_status, "open");
+    assert.equal(normalized.next_review_at, "2027-01-15");
+    assert.equal(normalized.application_url, "https://example.org/grant/apply");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("mark inactive maps to archived and excludes the listing from default discovery after publication", async () => {
+  const originalFetch = globalThis.fetch;
+  const rpcCalls: Array<{ name: string; body: Record<string, unknown> }> = [];
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    if (url.endsWith("/auth/v1/user"))
+      return Response.json({ id: "22222222-2222-4222-8222-222222222222", email: "moderator@example.org" });
+    if (url.includes("moderator_profiles")) return Response.json([{ role: "reviewer" }]);
+    if (url.includes("opportunity_submissions?submission_kind=eq.listing_update")) return Response.json([]);
+    if (url.endsWith("/rpc/create_listing_update")) {
+      rpcCalls.push({ name: "create_listing_update", body: JSON.parse(String(init?.body)) });
+      return Response.json("11111111-1111-4111-8111-111111111111");
+    }
+    if (url.endsWith("/rpc/perform_moderation_action")) {
+      rpcCalls.push({ name: "perform_moderation_action", body: JSON.parse(String(init?.body)) });
+      return Response.json("33333333-3333-4333-8333-333333333333");
+    }
+    throw new Error(`Unexpected request: ${url}`);
+  };
+  const env = { ...baseEnv, ASSETS: { fetch: async () => Response.json({ records: [canonicalModerationListing()] }) } } satisfies Env;
+  try {
+    const response = await worker.fetch(
+      new Request("https://fork.example/api/moderation/listings/existing-grant/inactive", {
+        method: "POST",
+        headers: { cookie: "pc_moderator_session=test-session", origin: "https://fork.example", "content-type": "application/json" },
+        body: JSON.stringify({
+          reason: "Provider confirms this program is no longer offered.",
+          claims_checked: ["program-exists"],
+        }),
+      }),
+      env,
+    );
+    assert.equal(response.status, 202);
+    const normalized = rpcCalls[0]?.body.p_normalized as Record<string, unknown>;
+    assert.equal(normalized.availability_status, "archived");
+    assert.equal(normalized.default_search_eligible, false);
+    assert.equal(normalized.status_reason, "Provider confirms this program is no longer offered.");
+    assert.equal(rpcCalls[1]?.body.p_action, "approve");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("moderator removal immediately upholds an internal report and enters validated removal workflow", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: Array<{ url: string; body?: unknown }> = [];
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    if (url.endsWith("/auth/v1/user"))
+      return Response.json({ id: "22222222-2222-4222-8222-222222222222", email: "moderator@example.org" });
+    if (url.includes("moderator_profiles")) return Response.json([{ role: "reviewer" }]);
+    if (url.endsWith("/rest/v1/listing_reports")) {
+      calls.push({ url, body: JSON.parse(String(init?.body)) });
+      return Response.json([{ id: "44444444-4444-4444-8444-444444444444" }]);
+    }
+    if (url.endsWith("/rpc/resolve_listing_report")) {
+      calls.push({ url, body: JSON.parse(String(init?.body)) });
+      return Response.json("existing-grant");
+    }
+    if (url.includes("listing_removal_batches?report_id=eq.")) return Response.json([]);
+    throw new Error(`Unexpected request: ${url}`);
+  };
+  const env = { ...baseEnv, ASSETS: { fetch: async () => Response.json({ records: [canonicalModerationListing()] }) } } satisfies Env;
+  try {
+    const response = await worker.fetch(
+      new Request("https://fork.example/api/moderation/listings/existing-grant/remove", {
+        method: "POST",
+        headers: { cookie: "pc_moderator_session=test-session", origin: "https://fork.example", "content-type": "application/json" },
+        body: JSON.stringify({ reason: "Program ended", notes: "Provider page says the program has ended." }),
+      }),
+      env,
+    );
+    assert.equal(response.status, 202);
+    const report = calls.find((call) => call.url.endsWith("/rest/v1/listing_reports"));
+    assert.equal((report?.body as Record<string, unknown>).listing_id, "existing-grant");
+    const resolution = calls.find((call) => call.url.endsWith("/rpc/resolve_listing_report"));
+    assert.equal((resolution?.body as Record<string, unknown>).p_decision, "upheld");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

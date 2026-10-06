@@ -80,7 +80,7 @@ const reviewDateLabel = listing.reviewDate ? formatDate(listing.reviewDate) : nu
           data-pagefind-meta="title"
         >
           {listing.title}
-        </h1><span data-feature-star={listing.id} class="mt-2 hidden shrink-0 text-amber-500" aria-label="Featured opportunity" title="Featured opportunity"><Star size={28} fill="currentColor" aria-hidden="true" /></span></div><button data-feature-toggle={listing.id} type="button" class="mt-3 hidden min-h-11 items-center gap-2 rounded-md border border-line px-3 text-sm font-medium" aria-pressed="false"><Star size={17} aria-hidden="true" /><span>Feature opportunity</span></button><p data-feature-status role="status" aria-live="polite" class="mt-2 text-sm text-muted"></p><p class="mt-6 max-w-3xl text-lg leading-8 text-muted">
+        </h1><span data-feature-star={listing.id} class="mt-2 hidden shrink-0 text-amber-500" aria-label="Featured opportunity" title="Featured opportunity"><Star size={28} fill="currentColor" aria-hidden="true" /></span></div><p class="mt-6 max-w-3xl text-lg leading-8 text-muted">
           {listing.description}
         </p>
         <section class="mt-10 border-t border-line pt-8">
@@ -232,6 +232,32 @@ const reviewDateLabel = listing.reviewDate ? formatDate(listing.reviewDate) : nu
         >
       </aside>
     </div>
+
+    <section
+      data-moderator-tools
+      hidden
+      class="mt-12 rounded-md border border-line bg-soft p-5 sm:p-6"
+      aria-labelledby="moderator-tools-heading"
+    >
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-wide text-muted">Signed-in moderator</p>
+          <h2 id="moderator-tools-heading" class="mt-1 text-xl font-semibold">Moderator tools</h2>
+          <p class="mt-2 max-w-3xl text-sm leading-6 text-muted">
+            Check the provider evidence, then edit, refresh verification, mark the record inactive, or remove it. Changes keep the existing audited publication/removal workflow.
+          </p>
+        </div>
+        <a href="/moderate/?queue=review" class="inline-flex min-h-11 items-center rounded-md border border-line bg-surface px-4 text-sm font-semibold no-underline">Open review queue</a>
+      </div>
+      <div class="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+        <a href={`/moderate/?listing=${encodeURIComponent(listing.id)}&action=edit`} class="inline-flex min-h-11 items-center justify-center rounded-md border border-line bg-surface px-3 text-sm font-semibold no-underline">Quick edit</a>
+        <a href={`/moderate/?listing=${encodeURIComponent(listing.id)}&action=verify`} class="inline-flex min-h-11 items-center justify-center rounded-md bg-green-700 px-3 text-sm font-semibold text-white no-underline">Verify current</a>
+        <a href={`/moderate/?listing=${encodeURIComponent(listing.id)}&action=inactive`} class="inline-flex min-h-11 items-center justify-center rounded-md border border-amber-300 bg-surface px-3 text-sm font-semibold text-amber-900 no-underline">Mark inactive</a>
+        <a href={`/moderate/?listing=${encodeURIComponent(listing.id)}&action=remove`} class="inline-flex min-h-11 items-center justify-center rounded-md border border-red-300 bg-surface px-3 text-sm font-semibold text-red-700 no-underline">Remove</a>
+        <button data-feature-toggle={listing.id} type="button" class="hidden min-h-11 items-center justify-center gap-2 rounded-md border border-line bg-surface px-3 text-sm font-semibold" aria-pressed="false"><Star size={17} aria-hidden="true" /><span>Feature opportunity</span></button>
+      </div>
+      <p data-feature-status role="status" aria-live="polite" class="mt-3 text-sm text-muted"></p>
+    </section>
   </article>
 
   <dialog

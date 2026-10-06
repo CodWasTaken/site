@@ -213,6 +213,12 @@ const structuredData = baseStructuredData(Astro.site!);
             if (!auth.ok) return;
             const authState = (await auth.json()) as { moderator?: unknown };
             if (!authState.moderator) return;
+            document
+              .querySelectorAll<HTMLElement>("[data-moderator-tools]")
+              .forEach((tools) => {
+                tools.hidden = false;
+                tools.classList.remove("hidden");
+              });
             const id = toggle.dataset.featureToggle;
             let featured = states.get(id)?.featured ?? false;
             const featureStatus = document.querySelector<HTMLElement>(

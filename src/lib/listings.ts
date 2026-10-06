@@ -58,9 +58,15 @@ export interface Listing {
   global?: boolean | null;
   remote?: boolean | null;
   countries?: string[];
+  physicalLocations?: string[];
+  statusReason?: string | null;
   reviewedAt?: string | null;
   nextReviewAt?: string | null;
   claimsChecked?: string[];
+  sponsorshipType?: string | null;
+  sponsorshipDisclosure?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
   reviewMethod: string | null;
   reviewState: string | null;
   reviewerReference: string | null;
@@ -196,6 +202,9 @@ export function normalizeListingRecord(
       evidenceUrls.find((evidence) => evidence.checkedAt)?.checkedAt?.slice(0, 10) ??
       "";
     const status = availability.status as ListingStatus;
+    const statusReason = typeof availability.statusReason === "string"
+      ? availability.statusReason
+      : null;
     const applicationUrl =
       typeof urls.applicationUrl === "string" ? urls.applicationUrl : null;
     const deadline =
@@ -204,6 +213,15 @@ export function normalizeListingRecord(
       typeof availability.deadlineType === "string" ? availability.deadlineType : null;
     const global = typeof geography.global === "boolean" ? geography.global : null;
     const remote = typeof geography.remote === "boolean" ? geography.remote : null;
+    const sponsorshipType = typeof sponsorship.sponsorshipType === "string"
+      ? sponsorship.sponsorshipType
+      : null;
+    const sponsorshipDisclosure = typeof sponsorship.sponsorshipDisclosure === "string"
+      ? sponsorship.sponsorshipDisclosure
+      : null;
+    const changeHistory = raw.changeHistory as Record<string, unknown>;
+    const createdAt = typeof changeHistory?.createdAt === "string" ? changeHistory.createdAt : null;
+    const updatedAt = typeof changeHistory?.updatedAt === "string" ? changeHistory.updatedAt : null;
     const editorialReviewState = deriveEditorialReviewState({
       schemaVersion: "2.0",
       reviewMethod,
@@ -256,9 +274,15 @@ export function normalizeListingRecord(
       global,
       remote,
       countries,
+      physicalLocations,
+      statusReason,
       reviewedAt,
       nextReviewAt,
       claimsChecked,
+      sponsorshipType,
+      sponsorshipDisclosure,
+      createdAt,
+      updatedAt,
       reviewMethod,
       reviewState,
       reviewerReference,
@@ -312,5 +336,9 @@ export function formatDate(value: string): string {
 }
 
 export function statusLabel(status: ListingStatus): string {
-  return status.charAt(0).toUpperCase() + status.slice(1);
+  if (status === "archived") return "Inactive";
+  return status
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }

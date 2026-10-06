@@ -58,6 +58,7 @@ import { categoryDefinitions } from "../lib/taxonomy";
         <div id="queue-tabs" class="flex min-w-max gap-1 border-b border-line">
           {
             [
+              ["review", "Published review"],
               ["pending", "Pending"],
               ["flagged", "Flagged"],
               ["unconfirmed", "Unconfirmed listings"],
@@ -85,6 +86,17 @@ import { categoryDefinitions } from "../lib/taxonomy";
           <option value="">All categories</option>
           {categoryDefinitions.map((category) => <option value={category.id}>{category.label}</option>)}
         </select>
+      </label>
+
+      <label id="published-review-search-label" class="mt-4 hidden max-w-xl">
+        <span class="text-xs font-semibold uppercase text-muted">Search published listings</span>
+        <input
+          id="published-review-search"
+          type="search"
+          maxlength="120"
+          placeholder="Title, provider, ID, benefit, or description"
+          class="mt-2 min-h-11 w-full rounded-md border border-line bg-surface px-3 text-sm"
+        />
       </label>
 
       <label id="unconfirmed-search-label" class="mt-4 hidden max-w-xl">
@@ -365,6 +377,27 @@ import { categoryDefinitions } from "../lib/taxonomy";
           </div>
         </aside>
       </div>
+
+      <section
+        id="published-review-view"
+        class="mt-5 hidden"
+        aria-labelledby="published-review-heading"
+      >
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 id="published-review-heading" class="text-lg font-semibold">Published opportunity review</h2>
+            <p class="mt-1 max-w-3xl text-sm leading-6 text-muted">
+              Oldest human verification comes first. Listings without a human review date come before dated records; equal dates fall back to title alphabetically. Check the provider links, then verify, edit, mark inactive, or remove.
+            </p>
+          </div>
+          <button
+            id="load-more-published-review"
+            type="button"
+            class="hidden min-h-11 rounded-md border border-line bg-surface px-4 text-sm font-semibold"
+          >Load more</button>
+        </div>
+        <div id="published-review-list" class="mt-4 grid gap-3"></div>
+      </section>
 
       <section
         id="reports-view"
@@ -698,6 +731,80 @@ import { categoryDefinitions } from "../lib/taxonomy";
         class="mt-6 min-h-11 w-full rounded-md bg-green-700 px-4 font-semibold text-white"
         >Approve and save</button
       >
+    </form>
+  </dialog>
+
+  <dialog
+    id="verify-listing-dialog"
+    aria-labelledby="verify-listing-heading"
+    class="moderation-dialog w-[min(600px,calc(100%-2rem))] rounded-md border-0 p-0 shadow-xl"
+  >
+    <form id="verify-listing-form" class="p-5 sm:p-7">
+      <div class="flex items-center justify-between gap-4">
+        <h2 id="verify-listing-heading" class="text-xl font-semibold">Verify current listing</h2>
+        <button type="button" data-close-dialog class="grid size-11 place-items-center" aria-label="Close"><X size={20} /></button>
+      </div>
+      <p id="verify-listing-description" class="mt-2 text-sm leading-6 text-muted"></p>
+      <input type="hidden" name="listing_id" />
+      <fieldset class="mt-5">
+        <legend class="text-sm font-medium">Claims you checked now</legend>
+        <div class="mt-2 grid gap-2 sm:grid-cols-2">{[
+          ["program-exists", "Program exists"], ["eligibility", "Eligibility"],
+          ["benefit", "Benefit"], ["application-url", "Application URL"],
+          ["deadline", "Deadline"], ["geography", "Geography"],
+        ].map(([value, label]) => <label class="flex min-h-11 items-center gap-2 rounded border border-line px-3"><input type="checkbox" name="claims_checked" value={value} /><span>{label}</span></label>)}</div>
+      </fieldset>
+      <label class="mt-4 block">
+        <span class="text-sm font-medium">Next review date</span>
+        <input required type="date" name="next_review_at" class="mt-1 min-h-11 w-full rounded-md border border-line px-3" />
+      </label>
+      <button type="submit" class="mt-5 min-h-11 w-full rounded-md bg-green-700 px-4 font-semibold text-white">Verify and queue approved update</button>
+    </form>
+  </dialog>
+
+  <dialog
+    id="inactive-listing-dialog"
+    aria-labelledby="inactive-listing-heading"
+    class="moderation-dialog w-[min(600px,calc(100%-2rem))] rounded-md border-0 p-0 shadow-xl"
+  >
+    <form id="inactive-listing-form" class="p-5 sm:p-7">
+      <div class="flex items-center justify-between gap-4">
+        <h2 id="inactive-listing-heading" class="text-xl font-semibold">Mark listing inactive</h2>
+        <button type="button" data-close-dialog class="grid size-11 place-items-center" aria-label="Close"><X size={20} /></button>
+      </div>
+      <p id="inactive-listing-description" class="mt-2 text-sm leading-6 text-muted"></p>
+      <input type="hidden" name="listing_id" />
+      <label class="mt-5 block"><span class="text-sm font-medium">Reason</span><textarea required name="reason" maxlength="1000" rows="3" class="mt-1 w-full rounded-md border border-line p-3" placeholder="For example: the provider confirms the program is no longer offered."></textarea></label>
+      <fieldset class="mt-4">
+        <legend class="text-sm font-medium">Claims checked during this review</legend>
+        <div class="mt-2 grid gap-2 sm:grid-cols-2">{[
+          ["program-exists", "Program exists / status checked"], ["eligibility", "Eligibility"],
+          ["benefit", "Benefit"], ["application-url", "Application URL"],
+          ["deadline", "Deadline"], ["geography", "Geography"],
+        ].map(([value, label]) => <label class="flex min-h-11 items-center gap-2 rounded border border-line px-3"><input type="checkbox" name="claims_checked" value={value} /><span>{label}</span></label>)}</div>
+      </fieldset>
+      <button type="submit" class="mt-5 min-h-11 w-full rounded-md border border-amber-400 bg-amber-50 px-4 font-semibold text-amber-950">Mark inactive and queue approved update</button>
+    </form>
+  </dialog>
+
+  <dialog
+    id="remove-listing-dialog"
+    aria-labelledby="remove-listing-heading"
+    class="moderation-dialog w-[min(520px,calc(100%-2rem))] rounded-md border-0 p-0 shadow-xl"
+  >
+    <form id="remove-listing-form" class="p-5 sm:p-7">
+      <div class="flex items-center justify-between gap-4">
+        <h2 id="remove-listing-heading" class="text-xl font-semibold">Remove published listing</h2>
+        <button type="button" data-close-dialog class="grid size-11 place-items-center" aria-label="Close"><X size={20} /></button>
+      </div>
+      <p id="remove-listing-description" class="mt-2 text-sm leading-6 text-muted"></p>
+      <input type="hidden" name="listing_id" />
+      <label class="mt-5 block"><span class="text-sm font-medium">Reason</span><select required name="reason" class="mt-1 min-h-11 w-full rounded-md border border-line px-3">{[
+        "Program ended", "Broken or dead listing", "Duplicate", "Provider requested removal", "Unsafe or misleading", "Other",
+      ].map((reason) => <option>{reason}</option>)}</select></label>
+      <label class="mt-4 block"><span class="text-sm font-medium">Internal notes <span class="font-normal text-muted">(optional)</span></span><textarea name="notes" rows="3" maxlength="2000" class="mt-1 w-full rounded-md border border-line p-3"></textarea></label>
+      <p class="mt-4 rounded bg-red-50 p-3 text-sm leading-6 text-red-900">Removal suppresses the listing immediately and starts the validated Git-removal workflow.</p>
+      <button type="submit" class="mt-5 min-h-11 w-full rounded-md bg-red-700 px-4 font-semibold text-white">Suppress and remove listing</button>
     </form>
   </dialog>
 
