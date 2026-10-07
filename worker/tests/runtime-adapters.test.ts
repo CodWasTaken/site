@@ -13,10 +13,10 @@ const baseEnv = (): Env => ({
   SUPABASE_PUBLISHABLE_KEY: "public",
   SUPABASE_SERVICE_ROLE_KEY: "service",
   SUBMISSION_FINGERPRINT_SECRET: "0123456789abcdef0123456789abcdef",
-  GITHUB_DATA_REPOSITORY: "CodWasTaken/data",
+  GITHUB_DATA_REPOSITORY: "PerkCommons/data",
   GITHUB_DATA_BRANCH: "main",
-  GITHUB_HEAD_OWNER: "CodWasTaken",
-  FORK_ONLY_MODE: "true",
+  GITHUB_HEAD_OWNER: "PerkCommons",
+  FORK_ONLY_MODE: "false",
 });
 
 test("shared API router preserves unknown-route JSON contract", async () => {
@@ -56,7 +56,7 @@ test("Vercel environment requires server Supabase values", () => {
   assert.throws(() => vercelEnv({ VERCEL: "1" }), /SUPABASE_URL/);
 });
 
-test("Vercel adapter always enables validated fork-only targets", () => {
+test("Vercel adapter defaults to the canonical organization targets", () => {
   const result = vercelEnv({
     VERCEL: "1",
     SUPABASE_URL: "https://example.supabase.co",
@@ -64,10 +64,10 @@ test("Vercel adapter always enables validated fork-only targets", () => {
     SUPABASE_SERVICE_ROLE_KEY: "service",
     SUBMISSION_FINGERPRINT_SECRET: "0123456789abcdef0123456789abcdef",
   });
-  assert.equal(result.GITHUB_DATA_REPOSITORY, "CodWasTaken/data");
+  assert.equal(result.GITHUB_DATA_REPOSITORY, "PerkCommons/data");
   assert.equal(result.GITHUB_DATA_BRANCH, "main");
-  assert.equal(result.GITHUB_HEAD_OWNER, "CodWasTaken");
-  assert.equal(result.FORK_ONLY_MODE, "true");
+  assert.equal(result.GITHUB_HEAD_OWNER, "PerkCommons");
+  assert.equal(result.FORK_ONLY_MODE, "false");
 });
 
 test("Vercel adapter maps production identity and Turnstile site key", () => {
@@ -80,10 +80,12 @@ test("Vercel adapter maps production identity and Turnstile site key", () => {
     SUBMISSION_FINGERPRINT_SECRET: "0123456789abcdef0123456789abcdef",
     PUBLIC_TURNSTILE_SITE_KEY: "site-key",
     TURNSTILE_SECRET_KEY: "secret-key",
+    GITHUB_SITE_DEPLOY_TOKEN: "site-deploy-token",
   });
   assert.equal(result.ENVIRONMENT, "production");
   assert.equal(result.TURNSTILE_SITE_KEY, "site-key");
   assert.equal(result.TURNSTILE_SECRET_KEY, "secret-key");
+  assert.equal(result.GITHUB_SITE_DEPLOY_TOKEN, "site-deploy-token");
 });
 
 test("Vercel preview maps to development environment", () => {
@@ -98,7 +100,7 @@ test("Vercel preview maps to development environment", () => {
   assert.equal(result.ENVIRONMENT, "development");
 });
 
-test("Vercel adapter refuses an original repository override", () => {
+test("Vercel adapter can opt into the legacy fork-only guard", () => {
   assert.throws(
     () =>
       vercelEnv({
@@ -109,6 +111,7 @@ test("Vercel adapter refuses an original repository override", () => {
         SUBMISSION_FINGERPRINT_SECRET:
           "0123456789abcdef0123456789abcdef",
         GITHUB_DATA_REPOSITORY: "PerkCommons/data",
+        FORK_ONLY_MODE: "true",
       }),
     /fork-only/i,
   );

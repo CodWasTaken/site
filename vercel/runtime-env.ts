@@ -41,10 +41,10 @@ export function vercelEnv(
       "SUBMISSION_FINGERPRINT_SECRET",
     ),
     GITHUB_DATA_REPOSITORY:
-      optional(source, "GITHUB_DATA_REPOSITORY") ?? "CodWasTaken/data",
+      optional(source, "GITHUB_DATA_REPOSITORY") ?? "PerkCommons/data",
     GITHUB_DATA_BRANCH: optional(source, "GITHUB_DATA_BRANCH") ?? "main",
-    GITHUB_HEAD_OWNER: optional(source, "GITHUB_HEAD_OWNER") ?? "CodWasTaken",
-    FORK_ONLY_MODE: "true",
+    GITHUB_HEAD_OWNER: optional(source, "GITHUB_HEAD_OWNER") ?? "PerkCommons",
+    FORK_ONLY_MODE: optional(source, "FORK_ONLY_MODE") ?? "false",
   };
 
   if (environment) env.ENVIRONMENT = environment;
@@ -63,8 +63,8 @@ export function vercelEnv(
   const siteRepository = optional(source, "GITHUB_SITE_REPOSITORY");
   if (siteRepository) env.GITHUB_SITE_REPOSITORY = siteRepository;
 
-  const deployHook = optional(source, "VERCEL_DEPLOY_HOOK_URL");
-  if (deployHook) env.VERCEL_DEPLOY_HOOK_URL = deployHook;
+  const siteDeployToken = optional(source, "GITHUB_SITE_DEPLOY_TOKEN");
+  if (siteDeployToken) env.GITHUB_SITE_DEPLOY_TOKEN = siteDeployToken;
 
   const cronSecret = optional(source, "CRON_SECRET");
   if (cronSecret) env.CRON_SECRET = cronSecret;
