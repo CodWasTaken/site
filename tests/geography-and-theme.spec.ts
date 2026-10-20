@@ -40,7 +40,7 @@ test("UI uses the supplied semantic palette in light and dark modes", async ({ p
 
   await page.evaluate(() => { document.documentElement.dataset.theme = "light"; });
   expect(await colors()).toMatchObject({
-    canvas: "#fafbfc", surface: "#ffffff", soft: "#f1f4f7",
+    canvas: "#fafbfc", surface: "#fff", soft: "#f1f4f7",
     ink: "#111827", muted: "#5b6472", line: "#dfe4ea",
     action: "#6254c7", link: "#5544c1",
     success: "#176b43", warning: "#825313", error: "#9b2c2c",
