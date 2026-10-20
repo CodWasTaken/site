@@ -207,6 +207,7 @@ const textareaClass = `${fieldClass} resize-y`;
 
   <script>
     import { TurnstileController } from "../lib/turnstile-client";
+    import { parseCountryCodes } from "../lib/geography";
 
     const form = document.querySelector<HTMLFormElement>("#submission-form");
     const status = document.querySelector<HTMLElement>("#form-status");
@@ -227,7 +228,7 @@ const textareaClass = `${fieldClass} resize-y`;
     countrySearch?.addEventListener("input", () => {
       countryBoxes.forEach((field) => {
         const label = field.closest<HTMLElement>("[data-country-label]");
-        if (label) label.hidden = !(label.dataset.countryLabel ?? "").includes(countrySearch.value.trim().toLowerCase());
+        if (label) label.hidden = !(label.dataset.countryLabel ?? "").includes(countrySearch?.value.trim().toLowerCase() ?? "");
       });
     });
 
@@ -266,8 +267,19 @@ const textareaClass = `${fieldClass} resize-y`;
           if ((field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement) && saved.fields[name] !== undefined) field.value = saved.fields[name]!;
         }
         for (const checkbox of form.querySelectorAll<HTMLInputElement>('input[name="subcategories"]')) checkbox.checked = saved.subcategories?.includes(checkbox.value) ?? false;
-        countryBoxes.forEach((field) => { field.checked = saved.countries?.includes(field.value) ?? false; });
-        if (draftStatus) draftStatus.textContent = "Local draft restored.";
+        // Preserve legacy ISO-code drafts without guessing unknown geography.
+        const previousLocation = saved.fields.location?.trim() ?? "";
+        const migratedCountries = saved.countries ??
+          (previousLocation.toLowerCase() === "global" ? [] : parseCountryCodes(previousLocation));
+        if (!saved.fields.global && migratedCountries.length) {
+          const scope = form.elements.namedItem("global");
+          if (scope instanceof HTMLSelectElement) scope.value = "false";
+        }
+        countryBoxes.forEach((field) => { field.checked = migratedCountries.includes(field.value); });
+        if (draftStatus) draftStatus.textContent =
+          previousLocation && previousLocation.toLowerCase() !== "global" && !migratedCountries.length
+            ? "Draft restored. Review your previous location: " + previousLocation + ". Select eligible countries."
+            : "Local draft restored.";
       } catch { localStorage.removeItem(draftKey); }
     };
     const saveDraft = () => {
