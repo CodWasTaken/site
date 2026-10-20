@@ -52,6 +52,8 @@ test("UI uses the supplied semantic palette in light and dark modes", async ({ p
     action: "#b9adff", link: "#c6b8ff",
     success: "#65d6a1", warning: "#f4c46d", error: "#fda5a5",
   });
-  const foreground = await page.locator(".bg-action").first().evaluate((node) => getComputedStyle(node).color);
-  expect(foreground).toBe("rgb(11, 13, 18)");
+  // The theme intentionally animates colors; assert the settled contrast.
+  await expect.poll(() => page.locator(".bg-action").first().evaluate(
+    (node) => getComputedStyle(node).color,
+  )).toBe("rgb(11, 13, 18)");
 });
