@@ -25,6 +25,11 @@
 
 :root {
   color-scheme: light;
+  /* Keep every reference token available even when Tailwind prunes unused utilities. */
+  --color-link: #5544c1;
+  --color-pink: #d98eb8;
+  --color-lavender: #b279c3;
+  --color-indigo: #7467d6;
   --motion-fast: 140ms;
   --motion-medium: 220ms;
   --interaction-shadow: 0 8px 22px rgb(17 24 39 / 0.1);
