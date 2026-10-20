@@ -35,3 +35,12 @@ jobs:
           PUBLIC_SUPABASE_PUBLISHABLE_KEY: test-publishable-key
           PUBLIC_TURNSTILE_SITE_KEY: test-public-site-key
       - run: npm run audit:site
+      - name: Install Chromium for UI checks
+        run: npx playwright install --with-deps chromium
+      - name: Run browser regression suite
+        run: npm run test:browser
+        env:
+          PERKCOMMONS_DATA_REPOSITORY_PATH: ${{ github.workspace }}/.data
+          PUBLIC_SUPABASE_URL: https://example.supabase.co
+          PUBLIC_SUPABASE_PUBLISHABLE_KEY: test-publishable-key
+          PUBLIC_TURNSTILE_SITE_KEY: test-public-site-key
