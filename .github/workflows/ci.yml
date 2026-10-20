@@ -13,11 +13,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: PerkCommons/data
-          ref: 6bff01c334cfef390180aaa729d24613866dbd35
+          ref: d1fe078899bb81b86260b09a68cf56fc93c0fa7b
           path: .data
       - name: Verify canonical data snapshot
         working-directory: .data
-        run: test "$(git rev-parse HEAD)" = "6bff01c334cfef390180aaa729d24613866dbd35"
+        run: test "$(git rev-parse HEAD)" = "d1fe078899bb81b86260b09a68cf56fc93c0fa7b"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -49,9 +49,9 @@ jobs:
       - name: Restore canonical data snapshot for site build
         working-directory: .data
         run: |
-          git reset --hard 6bff01c334cfef390180aaa729d24613866dbd35
+          git reset --hard d1fe078899bb81b86260b09a68cf56fc93c0fa7b
           git clean -fd
-          test "$(git rev-parse HEAD)" = "6bff01c334cfef390180aaa729d24613866dbd35"
+          test "$(git rev-parse HEAD)" = "d1fe078899bb81b86260b09a68cf56fc93c0fa7b"
           test -z "$(git status --porcelain)"
       - run: npm ci
       - run: npm test
